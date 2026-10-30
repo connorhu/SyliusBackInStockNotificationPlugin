@@ -1,0 +1,5 @@
+{% set form = hookable_metadata.context.form %}
+
+{% if form.preorderability is defined %}
+    {{ form_row(form.preorderability) }}
+{% endif %}

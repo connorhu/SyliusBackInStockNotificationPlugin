@@ -1,0 +1,20 @@
+webgriffe_bisn:
+    admin:
+        preorderability:
+            label: 'Előjegyzés'
+            help: 'Feliratkozhatnak-e az érdeklődők erre, amíg nem megvásárolható. Az öröklés a kategóriát, majd a bolt alapértelmezését követi; ha bármelyik kategória tiltja, tiltott.'
+            inherit: 'Örökli'
+            allowed: 'Engedélyezett'
+            forbidden: 'Tiltott'
+        channel:
+            section: 'Előjegyzés'
+            enabled_by_default: 'Előjegyzés alapértelmezetten engedélyezett'
+            enabled_by_default_help: 'Azokra a termékekre és kategóriákra vonatkozik, amelyek maguk nem döntenek.'
+            mode: 'Készlet érkezésekor'
+            mode_help: 'Sor: az első jelentkező korlátozott ideig megkapja a példányt. Leggyorsabb: mindenki értesítést kap, a leggyorsabb nyer.'
+            mode_queue: 'Sor (az első jelentkezőnek tartjuk)'
+            mode_fastest: 'Leggyorsabb nyer'
+            hold_hours: 'Tartási idő (óra)'
+            hold_hours_help: 'Meddig tartjuk a példányt annak, akinek felajánlottuk (1-720).'
+            rate_limit_seconds: 'Kérések közti legrövidebb idő (másodperc)'
+            rate_limit_seconds_help: 'E-mail-címenként (0-3600).'

@@ -2,7 +2,7 @@
 {% form_theme form '@SyliusShop/form/theme.html.twig' %}
 
 <div class="card my-3" {{ attributes }}>
-    {% if not sylius_inventory_is_available(variant) %}
+    {% if this.preorderable and not sylius_inventory_is_available(variant) %}
         <div class="card-body">
             <h5>{{ 'webgriffe_bisn.product_page.stock_notify_title'|trans }}:</h5>
             {% if notificationSent %}

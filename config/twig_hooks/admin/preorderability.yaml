@@ -1,0 +1,26 @@
+sylius_twig_hooks:
+    hooks:
+        'sylius_admin.product.create.content.form.sections.general':
+            preorderability:
+                template: '@WebgriffeSyliusBackInStockNotificationPlugin/admin/preorderability/field.html.twig'
+                priority: -100
+        'sylius_admin.product.update.content.form.sections.general':
+            preorderability:
+                template: '@WebgriffeSyliusBackInStockNotificationPlugin/admin/preorderability/field.html.twig'
+                priority: -100
+        'sylius_admin.taxon.create.content.sections.form.general':
+            preorderability:
+                template: '@WebgriffeSyliusBackInStockNotificationPlugin/admin/preorderability/field.html.twig'
+                priority: -100
+        'sylius_admin.taxon.update.content.sections.form.general':
+            preorderability:
+                template: '@WebgriffeSyliusBackInStockNotificationPlugin/admin/preorderability/field.html.twig'
+                priority: -100
+        'sylius_admin.channel.create.content.form.sections':
+            preorder:
+                template: '@WebgriffeSyliusBackInStockNotificationPlugin/admin/preorderability/channel_section.html.twig'
+                priority: 50
+        'sylius_admin.channel.update.content.form.sections':
+            preorder:
+                template: '@WebgriffeSyliusBackInStockNotificationPlugin/admin/preorderability/channel_section.html.twig'
+                priority: 50
