@@ -72,3 +72,23 @@ The `down()` removes subscriptions without a variant, since the old schema canno
 - `SubscriptionRepositoryInterface` gains `findManageableByEmail()`, `findActiveByEmail()`, `findOneByHashAndEmail()` and `findCancelledByIds()`.
 - The "new link" mail is sent on `kernel.terminate` by `ManageLinkMailer` (lookup included), so the request's timing does not reveal whether an
   address has pre-orders. `findOneByHashAndEmail()` and `findCancelledByIds()` take the channel as an extra argument.
+
+## Restock processing (BC break)
+
+- Run `webgriffe:back-in-stock-notification:alert` **every 5 minutes** instead of once a day (`*/5 * * * *`): it now also expires holds,
+  whose length is set in hours per channel. Overlapping runs exit at once (`LockableTrait`), which requires `symfony/lock` (now a dependency).
+- `AlertCommand` takes only the new `RestockProcessor` service (and the optional name); its old constructor arguments (logger, sender,
+  availability checker, repository, router) are gone. Its logic lives in `Webgriffe\SyliusBackInStockNotificationPlugin\Restock\RestockProcessor::process(\DateTimeImmutable $now): RestockReport`.
+  The command no longer deletes subscriptions without a variant (a product-target pre-order has none).
+- Per target (channel + product, or + variant for the `variant` target), in this order: a hold with `holdUntil <= now` is released and the
+  holder gets the new `webgriffe_back_in_stock_notification_hold_expired` mail (they stay `notified` and may still buy); a `notified` pre-order
+  without an active hold whose target has no sellable unit goes back to `waiting` (keeping its `createdAt`); then free units (sellable units
+  minus active holds) go to `waiting` pre-orders: `fastest` notifies all of them without a hold, `queue` notifies one per free unit in
+  `createdAt` order and holds that unit for the channel's hold hours, counted from the run that hands it over.
+- Sellable units (`SellableUnits`) use Sylius' plain `AvailabilityChecker` (an own instance, so a decorated `sylius.checker.inventory.availability`
+  does not apply), and count only enabled variants of enabled products that are in the channel and have a price there.
+- Each target's state is flushed before its mails are sent. A failing target is logged (`webgriffe_bisn.restock.target_failed`) and skipped;
+  a failing flush is logged (`webgriffe_bisn.restock.flush_failed`) and stops the run (exit code 1).
+- The `alert` mail gets the variables `mode`, `holdUntil` and `variant` and the keys `webgriffe_bisn.alert_email.held_until` / `.fastest`;
+  the alert and hold-expired templates read the product name and slug in the subscription's locale (`product.translation(localeCode)`),
+  so the links work from the console. `SubscriptionRepositoryInterface` gains `findRestockTargets()`.

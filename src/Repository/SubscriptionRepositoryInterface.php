@@ -61,4 +61,12 @@ interface SubscriptionRepositoryInterface extends RepositoryInterface
      * The newest pre-order of an e-mail address (canonical form) or of a customer on a channel, in any status.
      */
     public function findNewestByEmailOrCustomer(string $emailCanonical, ?CustomerInterface $customer, ChannelInterface $channel): ?SubscriptionInterface;
+
+    /**
+     * One active (waiting or notified) subscription per target (channel, product and, for the variant target, variant),
+     * lowest id first; the restock run loads each target's subscriptions with findActiveByTarget().
+     *
+     * @return list<SubscriptionInterface>
+     */
+    public function findRestockTargets(): array;
 }

@@ -2,11 +2,22 @@ services:
     Webgriffe\SyliusBackInStockNotificationPlugin\Command\AlertCommand:
         tags: [ 'console.command' ]
         arguments:
-            - '@monolog.logger'
-            - '@sylius.email_sender'
-            - '@sylius.checker.inventory.availability'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Restock\RestockProcessor'
+
+    Webgriffe\SyliusBackInStockNotificationPlugin\Restock\RestockProcessor:
+        arguments:
             - '@webgriffe.repository.back_in_stock_notification_subscription'
+            - '@webgriffe.manager.back_in_stock_notification_subscription'
+            - '@webgriffe.resolver.target'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Restock\SellableUnits'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Mailer\SafeSender'
             - '@router'
+            - '@monolog.logger'
+
+    # Sylius' plain availability on purpose: a hold-aware decorator of sylius.checker.inventory.availability must not apply here.
+    Webgriffe\SyliusBackInStockNotificationPlugin\Restock\SellableUnits:
+        arguments:
+            - !service { class: Sylius\Component\Inventory\Checker\AvailabilityChecker }
     
     Webgriffe\SyliusBackInStockNotificationPlugin\Controller\ManageController:
         tags: [ 'controller.service_arguments' ]

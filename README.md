@@ -118,10 +118,12 @@ parameters:
     router.request_context.scheme: https
 ```
 
-2. As said early this module provides a command that check the stock of the product. You have to set the command `bin/console webgriffe:back-in-stock-notification:alert` in the crontab, once a day is enough:
+2. As said early this module provides a command that checks the stock of the pre-ordered products, notifies the waiting
+   pre-orders (by the channel's restock mode, `fastest` or `queue`), passes expired holds on and moves pre-orders of a
+   sold-out product back to waiting. Holds are measured in hours, so run it every 5 minutes (overlapping runs exit at once):
 
 ```bash
-0 12 * * * <absolute-php-path> <absolute-path-to-sylius-dir>/bin/console webgriffe:back-in-stock-notification:alert
+*/5 * * * * <absolute-php-path> <absolute-path-to-sylius-dir>/bin/console webgriffe:back-in-stock-notification:alert
 ```
 
 ## Optional Configuration

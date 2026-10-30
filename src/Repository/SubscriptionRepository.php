@@ -141,6 +141,30 @@ final class SubscriptionRepository extends EntityRepository implements Subscript
         return $result;
     }
 
+    public function findRestockTargets(): array
+    {
+        $representatives = $this
+            ->createQueryBuilder('target')
+            ->select('MIN(target.id)')
+            ->andWhere('target.status IN (:statuses)')
+            ->groupBy('target.channel')
+            ->addGroupBy('target.product')
+            ->addGroupBy('target.productVariant')
+        ;
+
+        /** @var list<SubscriptionInterface> $result */
+        $result = $this
+            ->createQueryBuilder('subscription')
+            ->andWhere(sprintf('subscription.id IN (%s)', $representatives->getDQL()))
+            ->setParameter('statuses', SubscriptionStatus::ACTIVE)
+            ->addOrderBy('subscription.id', 'ASC')
+            ->getQuery()
+            ->getResult()
+        ;
+
+        return $result;
+    }
+
     private function createEmailQueryBuilder(string $emailCanonical, ChannelInterface $channel): QueryBuilder
     {
         return $this
