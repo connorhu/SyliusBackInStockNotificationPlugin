@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Webgriffe\SyliusBackInStockNotificationPlugin\Migrations;
 
+use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 
@@ -19,6 +20,12 @@ final class Version20220523152238 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
+        if ($this->connection->getDatabasePlatform() instanceof PostgreSQLPlatform) {
+            $this->addSql('ALTER TABLE webgriffe_back_in_stock_notification_subscription ADD notify BOOLEAN NOT NULL DEFAULT false');
+
+            return;
+        }
+
         $this->addSql('ALTER TABLE webgriffe_back_in_stock_notification_subscription ADD notify TINYINT(1) NOT NULL');
     }
 
