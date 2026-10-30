@@ -353,7 +353,7 @@ final class ManageControllerTest extends TestCase
         $twig->method('render')->willReturn('');
         $this->customerContext = $this->createMock(CustomerContextInterface::class);
         $this->links = new ManageLinkGenerator($router, new UriSigner('secret'));
-        $this->linkMailer = new ManageLinkMailer($this->repository, $this->links, new SafeSender($this->mailSender, new NullLogger()));
+        $this->linkMailer = new ManageLinkMailer($this->repository, $this->links, new SafeSender($this->mailSender, new NullLogger()), new NullLogger());
 
         return new ManageController(
             $twig,
