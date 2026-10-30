@@ -22,6 +22,7 @@ final class Version20220523152238 extends AbstractMigration
     {
         if ($this->connection->getDatabasePlatform() instanceof PostgreSQLPlatform) {
             $this->addSql('ALTER TABLE webgriffe_back_in_stock_notification_subscription ADD notify BOOLEAN NOT NULL DEFAULT false');
+            $this->addSql('ALTER TABLE webgriffe_back_in_stock_notification_subscription ALTER COLUMN notify DROP DEFAULT');
 
             return;
         }

@@ -37,6 +37,14 @@ final class PlatformMigrationsTest extends TestCase
         $sql = $this->upSql(Version20220523152238::class, new PostgreSQLPlatform());
 
         self::assertStringContainsString('ADD notify BOOLEAN NOT NULL DEFAULT false', $sql);
+        self::assertStringContainsString(
+            'ALTER TABLE webgriffe_back_in_stock_notification_subscription ALTER COLUMN notify DROP DEFAULT',
+            $sql,
+        );
+        self::assertGreaterThan(
+            strpos($sql, 'ADD notify BOOLEAN'),
+            strpos($sql, 'ALTER COLUMN notify DROP DEFAULT'),
+        );
         self::assertStringNotContainsString('TINYINT', $sql);
     }
 
