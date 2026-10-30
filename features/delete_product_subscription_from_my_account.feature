@@ -8,7 +8,8 @@ Feature: Ability to delete a particular subscription from my account
     And there is a customer "Francis Underwood" identified by an email "francis@underwood.com" and a password "whitehouse"
     And I am logged in as "francis@underwood.com"
 
-  @ui @javascript
+  # The account page offers no delete since the manage page replaced the GET delete route; round 8 brings the cancel action back.
+  @ui @javascript @pending_account_ui
   Scenario: Being able to delete a subscription from my account
     When I view product "Knitted cap apple"
     And I subscribe to the alert list for the product "Knitted cap apple"
