@@ -9,6 +9,7 @@ use Sylius\Bundle\ResourceBundle\Doctrine\ORM\EntityRepository;
 use Sylius\Component\Channel\Model\ChannelInterface;
 use Sylius\Component\Core\Model\ProductInterface;
 use Sylius\Component\Core\Model\ProductVariantInterface;
+use Sylius\Component\Customer\Model\CustomerInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionStatus;
 
@@ -110,6 +111,32 @@ final class SubscriptionRepository extends EntityRepository implements Subscript
             ->getQuery()
             ->getResult()
         ;
+
+        return $result;
+    }
+
+    public function findNewestByEmailOrCustomer(string $emailCanonical, ?CustomerInterface $customer, ChannelInterface $channel): ?SubscriptionInterface
+    {
+        $queryBuilder = $this
+            ->createQueryBuilder('subscription')
+            ->andWhere('subscription.channel = :channel')
+            ->setParameter('channel', $channel)
+            ->addOrderBy('subscription.createdAt', 'DESC')
+            ->addOrderBy('subscription.id', 'DESC')
+            ->setMaxResults(1)
+        ;
+        if (null === $customer) {
+            $queryBuilder->andWhere('subscription.emailCanonical = :emailCanonical');
+        } else {
+            $queryBuilder
+                ->andWhere('subscription.emailCanonical = :emailCanonical OR subscription.customer = :customer')
+                ->setParameter('customer', $customer)
+            ;
+        }
+        $queryBuilder->setParameter('emailCanonical', $emailCanonical);
+
+        /** @var SubscriptionInterface|null $result */
+        $result = $queryBuilder->getQuery()->getOneOrNullResult();
 
         return $result;
     }

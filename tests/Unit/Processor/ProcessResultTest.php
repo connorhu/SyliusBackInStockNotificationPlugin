@@ -24,6 +24,6 @@ final class ProcessResultTest extends TestCase
     public function testRefusalsAreErrorsForEveryone(): void
     {
         self::assertSame('webgriffe_bisn.subscription.not_preorderable', ProcessResult::NotPreorderable->errorKey(true));
-        self::assertSame('webgriffe_bisn.subscription.rate_limited', ProcessResult::RateLimited->errorKey(false));
+        self::assertSame('webgriffe_bisn.form_submission.rate_limited', ProcessResult::RateLimited->errorKey(false));
     }
 }

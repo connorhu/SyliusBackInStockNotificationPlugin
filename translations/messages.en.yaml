@@ -5,6 +5,9 @@ webgriffe:
 webgriffe_bisn:
     form_submission:
         subscription_successfully: 'Successfully subscribed, check your email!'
+        rate_limited:
+            title: 'You can pre-order again in a few minutes.'
+            body: '{1} We accept one pre-order per minute. Your details were kept, please try again shortly.|]1,Inf[ We accept one pre-order every %count% minutes. Your details were kept, please try again shortly.'
     my_account_section:
         menu_label: 'Products notification'
         title: 'Products notification'

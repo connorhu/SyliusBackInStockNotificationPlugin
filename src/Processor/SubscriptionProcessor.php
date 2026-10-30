@@ -21,6 +21,7 @@ use Webgriffe\SyliusBackInStockNotificationPlugin\Factory\SubscriptionFactoryInt
 use Webgriffe\SyliusBackInStockNotificationPlugin\Mailer\SafeSender;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Manage\ManageLinkGenerator;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Preorderability\PreorderabilityResolverInterface;
+use Webgriffe\SyliusBackInStockNotificationPlugin\RateLimit\PreorderRateLimiter;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Repository\SubscriptionRepositoryInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Session\GuestPreorderSession;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Target\TargetResolverInterface;
@@ -42,6 +43,7 @@ final class SubscriptionProcessor implements SubscriptionProcessorInterface
         private ManageLinkGenerator $manageLinkGenerator,
         private CanonicalizerInterface $canonicalizer,
         private LoggerInterface $logger,
+        private PreorderRateLimiter $rateLimiter,
     ) {
     }
 
@@ -66,10 +68,6 @@ final class SubscriptionProcessor implements SubscriptionProcessorInterface
             return ProcessResult::NotPreorderable;
         }
 
-        if ($this->isRateLimited($email, $customer, $clientIp)) {
-            return ProcessResult::RateLimited;
-        }
-
         $isGuest = null === $customer;
         $customerEmail = $customer?->getEmail();
         if (null !== $customerEmail && '' !== $customerEmail) {
@@ -84,6 +82,11 @@ final class SubscriptionProcessor implements SubscriptionProcessorInterface
 
         // A guest e-mail that belongs to an account attaches the pre-order to that customer.
         $customer ??= $this->accountCustomerFinder->find($emailCanonical);
+
+        // A duplicate never consumes a rate-limit token; a refused attempt stores and sends nothing.
+        if (!$this->rateLimiter->allow($emailCanonical, $customer, $clientIp, $channel, new \DateTimeImmutable())) {
+            return ProcessResult::RateLimited;
+        }
 
         $subscription = $this->subscriptionFactory->createWithData(
             $channel,
@@ -105,16 +108,6 @@ final class SubscriptionProcessor implements SubscriptionProcessorInterface
         $this->sendConfirmation($subscription, $product, $channel, $localeCode);
 
         return ProcessResult::Created;
-    }
-
-    /**
-     * The e-mail and IP limits arrive with the rate-limit round; until then nothing is limited.
-     *
-     * @psalm-suppress UnusedParam
-     */
-    private function isRateLimited(string $email, ?CustomerInterface $customer, ?string $clientIp): bool
-    {
-        return false;
     }
 
     private function sendConfirmation(SubscriptionInterface $subscription, ProductInterface $product, ChannelInterface $channel, string $localeCode): void
