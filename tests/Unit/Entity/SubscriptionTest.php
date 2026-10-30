@@ -33,11 +33,11 @@ final class SubscriptionTest extends TestCase
         self::assertNull($subscription->getHeldVariant());
         self::assertSame(SubscriptionStatus::NOTIFIED, $subscription->getStatus());
 
-        $subscription->markNotified($now, $variant, $until);
         $subscription->markWaiting();
         self::assertSame(SubscriptionStatus::WAITING, $subscription->getStatus());
         self::assertNull($subscription->getNotifiedAt());
         self::assertNull($subscription->getHoldUntil());
+        self::assertNull($subscription->getHeldVariant());
 
         $subscription->markNotified($now, $variant, $until);
         $subscription->markFulfilled($now);
@@ -51,6 +51,47 @@ final class SubscriptionTest extends TestCase
         self::assertSame(SubscriptionStatus::CANCELLED, $other->getStatus());
         self::assertFalse($other->isActive());
         self::assertNull($other->getHoldUntil());
+    }
+
+    /**
+     * @dataProvider illegalTransitions
+     */
+    public function testIllegalTransitionsThrow(string $from, string $transition): void
+    {
+        $now = new \DateTimeImmutable('2026-10-30 10:00:00');
+        $subscription = new Subscription();
+        match ($from) {
+            SubscriptionStatus::NOTIFIED => $subscription->markNotified($now, null, null),
+            SubscriptionStatus::FULFILLED => $subscription->markFulfilled($now),
+            SubscriptionStatus::CANCELLED => $subscription->markCancelled($now),
+            default => null,
+        };
+
+        $this->expectException(\LogicException::class);
+        match ($transition) {
+            'markNotified' => $subscription->markNotified($now, null, null),
+            'markWaiting' => $subscription->markWaiting(),
+            'markFulfilled' => $subscription->markFulfilled($now),
+            'markCancelled' => $subscription->markCancelled($now),
+            default => throw new \InvalidArgumentException($transition),
+        };
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function illegalTransitions(): iterable
+    {
+        yield 'notify a notified one' => [SubscriptionStatus::NOTIFIED, 'markNotified'];
+        yield 'notify a fulfilled one' => [SubscriptionStatus::FULFILLED, 'markNotified'];
+        yield 'notify a cancelled one' => [SubscriptionStatus::CANCELLED, 'markNotified'];
+        yield 'wait a waiting one' => [SubscriptionStatus::WAITING, 'markWaiting'];
+        yield 'wait a fulfilled one' => [SubscriptionStatus::FULFILLED, 'markWaiting'];
+        yield 'wait a cancelled one' => [SubscriptionStatus::CANCELLED, 'markWaiting'];
+        yield 'fulfil a fulfilled one' => [SubscriptionStatus::FULFILLED, 'markFulfilled'];
+        yield 'fulfil a cancelled one' => [SubscriptionStatus::CANCELLED, 'markFulfilled'];
+        yield 'cancel a fulfilled one' => [SubscriptionStatus::FULFILLED, 'markCancelled'];
+        yield 'cancel a cancelled one' => [SubscriptionStatus::CANCELLED, 'markCancelled'];
     }
 
     public function testRestoreAfterCancelKeepsCreatedAt(): void

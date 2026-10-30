@@ -188,6 +188,7 @@ class Subscription implements SubscriptionInterface
 
     public function markNotified(\DateTimeImmutable $now, ?ProductVariantInterface $heldVariant, ?\DateTimeImmutable $holdUntil): void
     {
+        $this->assertStatus(SubscriptionStatus::WAITING, 'notified');
         $this->status = SubscriptionStatus::NOTIFIED;
         $this->notifiedAt = $now;
         $this->heldVariant = $heldVariant;
@@ -202,6 +203,7 @@ class Subscription implements SubscriptionInterface
 
     public function markWaiting(): void
     {
+        $this->assertStatus(SubscriptionStatus::NOTIFIED, 'moved back to waiting');
         $this->status = SubscriptionStatus::WAITING;
         $this->notifiedAt = null;
         $this->releaseHold();
@@ -209,6 +211,7 @@ class Subscription implements SubscriptionInterface
 
     public function markFulfilled(\DateTimeImmutable $now): void
     {
+        $this->assertStatus(SubscriptionStatus::ACTIVE, 'fulfilled');
         $this->status = SubscriptionStatus::FULFILLED;
         $this->fulfilledAt = $now;
         $this->releaseHold();
@@ -216,6 +219,7 @@ class Subscription implements SubscriptionInterface
 
     public function markCancelled(\DateTimeImmutable $now): void
     {
+        $this->assertStatus(SubscriptionStatus::ACTIVE, 'cancelled');
         $this->status = SubscriptionStatus::CANCELLED;
         $this->cancelledAt = $now;
         $this->releaseHold();
@@ -245,5 +249,15 @@ class Subscription implements SubscriptionInterface
     public function isDismissed(): bool
     {
         return null !== $this->dismissedAt;
+    }
+
+    /**
+     * @param string|list<string> $allowed
+     */
+    private function assertStatus(string|array $allowed, string $action): void
+    {
+        if (!in_array($this->status, (array) $allowed, true)) {
+            throw new \LogicException(sprintf('A subscription with status "%s" cannot be %s.', $this->status, $action));
+        }
     }
 }

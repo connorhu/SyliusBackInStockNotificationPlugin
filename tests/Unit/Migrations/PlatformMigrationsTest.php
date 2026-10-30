@@ -102,6 +102,14 @@ final class PlatformMigrationsTest extends TestCase
         self::assertStringContainsString('DROP notify', $sql);
         self::assertStringNotContainsString('TIMESTAMP', $sql);
         self::assertStringNotContainsString('SET NOT NULL', $sql);
+        // MySQL error 1832: a column used by a foreign key cannot be changed while the key exists.
+        $dropFk = strpos($sql, 'DROP FOREIGN KEY FK_1F046E38A80EF684');
+        self::assertNotFalse($dropFk);
+        self::assertLessThan(strpos($sql, 'CHANGE product_variant_id'), $dropFk);
+        self::assertGreaterThan(
+            strpos($sql, 'CHANGE product_variant_id'),
+            strpos($sql, 'ADD CONSTRAINT FK_1F046E38A80EF684'),
+        );
     }
 
     public function testDownMigrationsAreAvailableOnBothPlatforms(): void
@@ -123,6 +131,11 @@ final class PlatformMigrationsTest extends TestCase
             $lifecycle->down(new Schema());
             self::assertStringContainsString('ADD notify', $this->statements($lifecycle));
             self::assertStringContainsString('DROP product_id', $this->statements($lifecycle));
+            $down = $this->statements($lifecycle);
+            self::assertLessThan(
+                strpos($down, $platform instanceof PostgreSQLPlatform ? 'ALTER COLUMN product_variant_id SET NOT NULL' : 'CHANGE product_variant_id'),
+                strpos($down, 'FK_1F046E38A80EF684'),
+            );
         }
     }
 

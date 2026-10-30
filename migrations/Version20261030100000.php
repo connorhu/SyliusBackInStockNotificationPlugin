@@ -57,8 +57,9 @@ final class Version20261030100000 extends AbstractMigration
 
         $this->addSql("ALTER TABLE $table ADD product_id INT DEFAULT NULL, ADD name VARCHAR(255) DEFAULT NULL, ADD email_canonical VARCHAR(255) DEFAULT NULL, ADD status VARCHAR(16) NOT NULL DEFAULT 'waiting', ADD notified_at DATETIME DEFAULT NULL COMMENT '(DC2Type:datetime_immutable)', ADD hold_until DATETIME DEFAULT NULL COMMENT '(DC2Type:datetime_immutable)', ADD held_variant_id INT DEFAULT NULL, ADD fulfilled_at DATETIME DEFAULT NULL COMMENT '(DC2Type:datetime_immutable)', ADD cancelled_at DATETIME DEFAULT NULL COMMENT '(DC2Type:datetime_immutable)', ADD dismissed_at DATETIME DEFAULT NULL COMMENT '(DC2Type:datetime_immutable)'");
         $this->addBackfill();
-        $this->addSql("ALTER TABLE $table CHANGE status status VARCHAR(16) NOT NULL, CHANGE product_id product_id INT NOT NULL, CHANGE email_canonical email_canonical VARCHAR(255) NOT NULL, CHANGE product_variant_id product_variant_id INT DEFAULT NULL, DROP notify");
+        // The key must go before its column is changed (MySQL error 1832).
         $this->addSql("ALTER TABLE $table DROP FOREIGN KEY FK_1F046E38A80EF684");
+        $this->addSql("ALTER TABLE $table CHANGE status status VARCHAR(16) NOT NULL, CHANGE product_id product_id INT NOT NULL, CHANGE email_canonical email_canonical VARCHAR(255) NOT NULL, CHANGE product_variant_id product_variant_id INT DEFAULT NULL, DROP notify");
         $this->addSql("ALTER TABLE $table ADD CONSTRAINT FK_1F046E38A80EF684 FOREIGN KEY (product_variant_id) REFERENCES sylius_product_variant (id) ON DELETE CASCADE");
         $this->addSql("ALTER TABLE $table ADD CONSTRAINT FK_1F046E384584665A FOREIGN KEY (product_id) REFERENCES sylius_product (id) ON DELETE CASCADE");
         $this->addSql("ALTER TABLE $table ADD CONSTRAINT FK_1F046E38DEA2B72E FOREIGN KEY (held_variant_id) REFERENCES sylius_product_variant (id) ON DELETE SET NULL");
