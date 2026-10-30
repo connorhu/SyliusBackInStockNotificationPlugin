@@ -5,14 +5,12 @@ declare(strict_types=1);
 namespace Tests\Webgriffe\SyliusBackInStockNotificationPlugin\Behat\Context\Ui\Shop;
 
 use Behat\Behat\Context\Context;
-use Sylius\Behat\NotificationType;
-use Sylius\Behat\Service\NotificationCheckerInterface;
 use Tests\Webgriffe\SyliusBackInStockNotificationPlugin\Behat\Page\Shop\Account\Subscription\IndexPageInterface;
 use Webmozart\Assert\Assert;
 
 final class AccountContext implements Context
 {
-    public function __construct(private IndexPageInterface $subscriptionIndexPage, private NotificationCheckerInterface $notificationChecker)
+    public function __construct(private IndexPageInterface $subscriptionIndexPage)
     {
     }
 
@@ -25,19 +23,19 @@ final class AccountContext implements Context
     }
 
     /**
-     * @When /^I delete the first subscription$/
+     * @When /^I cancel the first subscription$/
      */
-    public function iDeleteTheFirstSubscription(): void
+    public function iCancelTheFirstSubscription(): void
     {
-        $this->subscriptionIndexPage->deleteFirstSubscription();
+        $this->subscriptionIndexPage->cancelFirstSubscription();
     }
 
     /**
-     * @Then /^I should be notified that the subscription has been successfully deleted$/
+     * @Then /^I should be able to undo the cancellation$/
      */
-    public function iShouldBeNotifiedThatTheSubscriptionHasBeenSuccessfullyDeleted(): void
+    public function iShouldBeAbleToUndoTheCancellation(): void
     {
-        $this->notificationChecker->checkNotification('Mail is deleted from the notification alert list', NotificationType::info());
+        Assert::true($this->subscriptionIndexPage->hasUndoBar());
     }
 
     /**

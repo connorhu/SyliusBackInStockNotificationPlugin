@@ -1,10 +1,49 @@
+webgriffe:
+    ui:
+        back_in_stock_notification_subscriptions: 'Előjegyzések'
+
 webgriffe_bisn:
     form_submission:
+        subscription_successfully: 'Az előjegyzésedet rögzítettük, nézd meg a postaládád!'
         rate_limited:
             title: 'Pár perc múlva jegyezhetsz elő újra.'
             body: '{1} Percenként egy előjegyzést fogadunk el. Az adataid megmaradtak, próbáld újra kicsit később.|{2} Két percenként egy előjegyzést fogadunk el. Az adataid megmaradtak, próbáld újra kicsit később.|]2,Inf[ %count% percenként egy előjegyzést fogadunk el. Az adataid megmaradtak, próbáld újra kicsit később.'
+    my_account_section:
+        menu_label: 'Előjegyzések'
+        title: 'Előjegyzéseim'
+        sub_title: 'A termékek, amikre várakozol'
+        info_empty_list: 'Információ'
+        empty_list: 'Nincs előjegyzésed.'
+        cancel: 'Visszavonás'
+        remove: 'Eltávolítás'
+        undo: 'Mégse'
+        cancelled: 'Az előjegyzést visszavontad.'
+        buy: 'Megveszem'
+        held_until: 'Egy példányt {until}-ig félreteszünk neked.'
+        arrived: 'Megérkezett: amíg kapható, még megveheted.'
+        next_in_line: 'Te vagy a következő.'
+        in_line: 'A sorban: {position}.'
+        state:
+            waiting: 'Várakozik'
+            held: 'Félretéve neked'
+            arrived: 'Megérkezett'
+            fulfilled: 'Megvetted'
     product_page:
+        stock_notify_title: 'Jegyezd elő, és írunk, amikor megvásárolható'
+        form_action: 'Előjegyzés'
         name: 'Neved'
+        preordered: 'Előjegyezve'
+        arrived: 'Megérkezett egy példány: amíg kapható, megveheted.'
+        next_in_line: 'Te vagy a következő.'
+        in_line: 'A sorban: {position}.'
+        cancel: 'Visszavonás'
+        cancelled: 'Az előjegyzést visszavontad.'
+        undo: 'Mégse'
+        guest_manage_hint: 'Visszavonni a levelünkben kapott hivatkozással tudod.'
+        held_for_you_label: 'Félretéve neked'
+        held_for_you: 'Egy példányt {until}-ig félreteszünk neked.'
+        held_for_others: 'Minden példány egy előjegyzőnek van félretéve {until}-ig. Ha a félretétel lejár, újra kapható lehet.'
+        held_for_others_no_date: 'Minden példány egy előjegyzőnek van félretéve. Ha a félretétel lejár, újra kapható lehet.'
     subscription_mail:
         subscription_title: 'Az előjegyzésed rögzítettük'
         subscription_message: 'Rögzítettük a kérésedet: értesítünk, amint a(z) <a href="{url}">{product}</a> megvásárolható.'
@@ -66,3 +105,17 @@ webgriffe_bisn:
             hold_hours_help: 'Meddig tartjuk a példányt annak, akinek felajánlottuk (1-720).'
             rate_limit_seconds: 'Kérések közti legrövidebb idő (másodperc)'
             rate_limit_seconds_help: 'E-mail-címenként (0-3600).'
+        subscriptions_subtitle: 'Előjegyzések kezelése'
+        menu_label: 'Előjegyzések'
+        delete_supscription: 'Előjegyzés törlése'
+        show_product: 'Termék megtekintése'
+        show_customer: 'Vevő megtekintése'
+        cancel_subscription: 'Előjegyzés visszavonása'
+        subscriber_name: 'Név'
+        hold_until: 'Félretéve eddig'
+        product_filter: 'Termékkód'
+    status:
+        waiting: 'Várakozik'
+        notified: 'Értesítve'
+        fulfilled: 'Teljesült'
+        cancelled: 'Visszavonva'

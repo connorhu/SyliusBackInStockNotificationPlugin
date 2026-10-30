@@ -39,11 +39,19 @@
 Webgriffe\SyliusBackInStockNotificationPlugin\WebgriffeSyliusBackInStockNotificationPlugin::class => ['all' => true],
 ```
 
-3. Import the plugin routes by creating a file in `config/routes/webgriffe_sylius_back_in_stock_notification_plugin.yaml` with the follwing content:
+3. Import the plugin routes by creating a file in `config/routes/webgriffe_sylius_back_in_stock_notification_plugin.yaml`. The shop
+   routes (product-page actions, account page, manage and claim links) live under the locale prefix:
 
 ```yaml
-webgriffe_sylius_back_in_stock_notification_plugin:
-  resource: "@WebgriffeSyliusBackInStockNotificationPlugin/config/routing.yaml"
+webgriffe_back_in_stock_notification_admin:
+    resource: "@WebgriffeSyliusBackInStockNotificationPlugin/config/routing/admin_routing.yaml"
+    prefix: '/%sylius_admin.path_name%'
+
+webgriffe_back_in_stock_notification_shop:
+    resource: "@WebgriffeSyliusBackInStockNotificationPlugin/config/routing/shop_routing.yaml"
+    prefix: /{_locale}
+    requirements:
+        _locale: ^[A-Za-z]{2,4}(_([A-Za-z]{4}|[0-9]{3}))?(_([A-Za-z]{2}|[0-9]{3}))?$
 ```
 
 4. Import required packages config in your `config/packages/webgriffe_sylius_back_in_stock_notification_plugin.yaml` file:
@@ -106,6 +114,39 @@ property yourself):
 
 and for the channel `preorder_enabled_by_default` (boolean, default `true`), `preorder_mode` (string 16, default `queue`),
 `preorder_hold_hours` (integer, default `24`), `preorder_rate_limit_seconds` (integer, default `120`).
+
+## Pre-orders, queue and holds (fork)
+
+Besides the stock alert this fork turns the subscription into a pre-order with a lifecycle (`waiting`, `notified`, `fulfilled`,
+`cancelled`), a per-channel restock mode (`queue`: the first in line gets a copy held for the channel's hold hours; `fastest`: everyone
+is notified), guest pre-orders (name and e-mail, honeypot, rate limits) with signed manage links, and a neutral UI:
+
+* **Product page**: one block for every state of the visitor (can pre-order, pre-ordered with queue position and cancel, held for you
+  until a date, held for somebody else, nothing when the item can be bought). A logged-in customer pre-orders with one click; a guest
+  fills in name and e-mail; a guest cancels through the link in the e-mail.
+* **Account**: "Pre-orders" page (Sylius account layout, menu entry) listing the customer's own pre-orders and those a guest made with
+  the customer's e-mail, with cancel (undo for 10 minutes), remove for fulfilled ones and "held for you until ..." with a buy link.
+* **Admin**: the subscription grid shows product, variant, name, e-mail, status, hold deadline and date, filters by status, product code,
+  channel and e-mail, and has a cancel action. Products, categories and channels get the pre-order settings.
+
+### Target
+
+```yaml
+# config/packages/webgriffe_sylius_back_in_stock_notification_plugin.yaml
+webgriffe_sylius_back_in_stock_notification:
+    target: variant  # or `product`: a pre-order waits for any variant of the product
+    display_timezone: ~  # e.g. Europe/Budapest; null prints dates in the PHP default time zone
+```
+
+Dates in the shop (hold deadlines, the account list) are printed with Twig's `format_datetime` (`twig/intl-extra`) in the request
+locale; `display_timezone` selects the time zone, which matters when PHP runs in UTC but the shop does not.
+
+### Twig helpers for themes
+
+`webgriffe_bisn_view(product, variant = null)` returns the visitor's `PreorderView` (`state`: a `PreorderState`, `subscription`,
+`holdUntil`, `position`); `webgriffe_bisn_account_summary()` returns `{active, actionable}` of the logged-in customer (null for a guest;
+for a header badge); `webgriffe_bisn_hold_deadlines(products)` returns the latest active hold deadline per product id in one query;
+`webgriffe_bisn_timezone()` returns `display_timezone`.
 
 ## Configuration
 

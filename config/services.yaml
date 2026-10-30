@@ -37,6 +37,33 @@ services:
             - '@limiter.webgriffe_bisn_manage_link_email'
             - '@limiter.webgriffe_bisn_manage_link_ip'
 
+    Webgriffe\SyliusBackInStockNotificationPlugin\Controller\AccountController:
+        tags: [ 'controller.service_arguments' ]
+        arguments:
+            - '@twig'
+            - '@router'
+            - '@security.csrf.token_manager'
+            - '@webgriffe.repository.back_in_stock_notification_subscription'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Session\CancelUndoSession'
+            - '@sylius.context.customer'
+            - '@sylius.context.channel'
+
+    Webgriffe\SyliusBackInStockNotificationPlugin\Controller\AdminCancelController:
+        tags: [ 'controller.service_arguments' ]
+        arguments:
+            - '@router'
+            - '@security.csrf.token_manager'
+            - '@webgriffe.repository.back_in_stock_notification_subscription'
+
+    Webgriffe\SyliusBackInStockNotificationPlugin\Twig\PreorderExtension:
+        arguments:
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\State\PreorderStateResolver'
+            - '@webgriffe.repository.back_in_stock_notification_subscription'
+            - '@sylius.context.channel'
+            - '@sylius.context.customer'
+            - '%webgriffe_sylius_back_in_stock_notification_plugin.display_timezone%'
+        tags: [ 'twig.extension' ]
+
     Webgriffe\SyliusBackInStockNotificationPlugin\Manage\ManageLinkGenerator:
         arguments:
             - '@router'
@@ -120,7 +147,10 @@ services:
             - '@Webgriffe\SyliusBackInStockNotificationPlugin\Processor\SubscriptionProcessor'
             - '@sylius.repository.product'
             - '@sylius.repository.product_variant'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\State\PreorderStateResolver'
             - '@Webgriffe\SyliusBackInStockNotificationPlugin\Preorderability\PreorderabilityResolver'
+            - '@webgriffe.repository.back_in_stock_notification_subscription'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Session\CancelUndoSession'
             - '@sylius.context.channel'
             - '@request_stack'
             - '@monolog.logger'

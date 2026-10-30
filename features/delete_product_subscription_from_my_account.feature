@@ -1,5 +1,5 @@
 @customer_account
-Feature: Ability to delete a particular subscription from my account
+Feature: Ability to cancel a particular pre-order from my account
 
   Background:
     Given the store operates on a single channel in "United States"
@@ -9,11 +9,11 @@ Feature: Ability to delete a particular subscription from my account
     And I am logged in as "francis@underwood.com"
 
   @ui @javascript
-  Scenario: Being able to delete a subscription from my account
+  Scenario: Being able to cancel a pre-order from my account
     When I view product "Knitted cap apple"
     And I subscribe to the alert list for the product "Knitted cap apple"
     And I browse to my product subscriptions
     Then I should see only one subscription
-    And I delete the first subscription
-    Then I should be notified that the subscription has been successfully deleted
+    And I cancel the first subscription
+    Then I should be able to undo the cancellation
     And there should be no subscriptions

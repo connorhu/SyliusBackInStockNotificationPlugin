@@ -15,6 +15,7 @@ use Sylius\Component\Core\Model\ProductVariantInterface;
 use Sylius\Component\Core\Repository\ProductRepositoryInterface;
 use Sylius\Component\Core\Repository\ProductVariantRepositoryInterface;
 use Sylius\Component\Customer\Context\CustomerContextInterface;
+use Sylius\Component\Customer\Model\CustomerInterface;
 use Sylius\Component\Product\Resolver\ProductVariantResolverInterface;
 use Sylius\TwigHooks\LiveComponent\HookableLiveComponentTrait;
 use Symfony\Component\Form\FormError;
@@ -29,11 +30,16 @@ use Symfony\UX\LiveComponent\Attribute\LiveProp;
 use Symfony\UX\LiveComponent\ComponentWithFormTrait;
 use Symfony\UX\LiveComponent\DefaultActionTrait;
 use Symfony\UX\TwigComponent\Attribute\PostMount;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Form\SubscriptionType;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Preorderability\PreorderabilityResolverInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Processor\ProcessResult;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Processor\SubscriptionProcessorInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\RateLimit\PreorderRateLimiter;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Repository\SubscriptionRepositoryInterface;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Session\CancelUndoSession;
+use Webgriffe\SyliusBackInStockNotificationPlugin\State\PreorderStateResolver;
+use Webgriffe\SyliusBackInStockNotificationPlugin\State\PreorderView;
 use Webmozart\Assert\Assert;
 
 #[AsLiveComponent]
@@ -56,6 +62,12 @@ final class AddNotificationComponent
     #[LiveProp]
     public bool $isCustomerLoggedIn = false;
 
+    /** Whether the visitor just cancelled their pre-order here and can still undo it (the toast with the undo button). */
+    #[LiveProp]
+    public bool $cancelled = false;
+
+    private ?PreorderView $view = null;
+
     public function __construct(
         protected readonly FormFactoryInterface $formFactory,
         protected readonly ProductVariantResolverInterface $productVariantResolver,
@@ -63,7 +75,10 @@ final class AddNotificationComponent
         protected readonly SubscriptionProcessorInterface $subscriptionProcessor,
         ProductRepositoryInterface $productRepository,
         ProductVariantRepositoryInterface $productVariantRepository,
+        protected readonly PreorderStateResolver $stateResolver,
         protected readonly PreorderabilityResolverInterface $preorderabilityResolver,
+        protected readonly SubscriptionRepositoryInterface $subscriptionRepository,
+        protected readonly CancelUndoSession $cancelUndoSession,
         protected readonly ChannelContextInterface $channelContext,
         protected readonly RequestStack $requestStack,
         protected readonly LoggerInterface $logger,
@@ -73,7 +88,25 @@ final class AddNotificationComponent
     }
 
     /**
-     * Whether new subscriptions are accepted for the product in the current channel (the block renders nothing otherwise).
+     * The visitor's pre-order state for the product (or selected variant) in the current channel; the template renders
+     * nothing for a sellable or not pre-orderable target.
+     */
+    public function getView(): PreorderView
+    {
+        if (null === $this->view) {
+            $channel = $this->channelContext->getChannel();
+            Assert::isInstanceOf($channel, ChannelInterface::class);
+            Assert::notNull($this->product);
+
+            $this->view = $this->stateResolver->resolve($this->product, $this->variant, $channel);
+        }
+
+        return $this->view;
+    }
+
+    /**
+     * Whether new pre-orders are accepted for the product in the current channel (the held-for-others state still
+     * needs the answer; the resolver only checks it for a target without units).
      */
     public function isPreorderable(): bool
     {
@@ -82,6 +115,32 @@ final class AddNotificationComponent
         Assert::notNull($this->product);
 
         return $this->preorderabilityResolver->isPreorderable($this->product, $channel);
+    }
+
+    /**
+     * The end of the latest active hold on the product, shown to a visitor who cannot buy the held copies.
+     */
+    public function getHoldDeadline(): ?\DateTimeImmutable
+    {
+        $channel = $this->channelContext->getChannel();
+        $id = $this->product?->getId();
+        if (!$channel instanceof ChannelInterface || !is_int($id)) {
+            return null;
+        }
+
+        return $this->subscriptionRepository->activeHoldDeadlinesByProduct([$id], $channel)[$id] ?? null;
+    }
+
+    /**
+     * Whether the visitor may cancel the pre-order of the current view here: a logged-in customer's own; a guest cancels
+     * through the manage link of the e-mails.
+     */
+    public function canCancel(): bool
+    {
+        $subscription = $this->getView()->subscription;
+        $customer = $this->customerContext->getCustomer();
+
+        return null !== $subscription && null !== $customer && $subscription->isActive() && $this->isOwnedBy($subscription, $customer);
     }
 
     protected function instantiateForm(): FormInterface
@@ -126,6 +185,8 @@ final class AddNotificationComponent
     {
         $this->notificationSent = false;
         $this->rateLimitedMinutes = null;
+        $this->cancelled = false;
+        $this->view = null;
         $this->formValues['product_variant_code'] = $this->variant?->getCode();
         $this->submitForm();
 
@@ -175,5 +236,59 @@ final class AddNotificationComponent
         // A guest gets the same answer whether or not the address already had a pre-order.
         $this->notificationSent = true;
         $this->resetForm();
+    }
+
+    #[LiveAction]
+    public function cancel(): void
+    {
+        $this->view = null;
+        $subscription = $this->getView()->subscription;
+        $customer = $this->customerContext->getCustomer();
+        if (null !== $subscription && null !== $customer && $subscription->isActive() && $this->isOwnedBy($subscription, $customer)) {
+            $now = new \DateTimeImmutable();
+            $subscription->markCancelled($now);
+            $this->subscriptionRepository->add($subscription);
+            /** @psalm-suppress MixedAssignment */
+            $id = $subscription->getId();
+            if (is_int($id)) {
+                $this->cancelUndoSession->remember([$id], $now);
+                $this->cancelled = true;
+            }
+        }
+        $this->view = null;
+    }
+
+    #[LiveAction]
+    public function restore(): void
+    {
+        $customer = $this->customerContext->getCustomer();
+        $channel = $this->channelContext->getChannel();
+        if (null !== $customer && $channel instanceof ChannelInterface) {
+            $subscriptions = $this->subscriptionRepository->findCancelledByIds(
+                $this->cancelUndoSession->take(new \DateTimeImmutable()),
+                (string) $customer->getEmailCanonical(),
+                $channel,
+            );
+            foreach ($subscriptions as $subscription) {
+                if ($this->isOwnedBy($subscription, $customer)) {
+                    $subscription->restore();
+                    $this->subscriptionRepository->add($subscription);
+                }
+            }
+        }
+        $this->cancelled = false;
+        $this->view = null;
+    }
+
+    private function isOwnedBy(SubscriptionInterface $subscription, CustomerInterface $customer): bool
+    {
+        $owner = $subscription->getCustomer();
+        if (null !== $owner) {
+            return $owner === $customer || (null !== $owner->getId() && $owner->getId() === $customer->getId());
+        }
+
+        $emailCanonical = (string) $customer->getEmailCanonical();
+
+        return '' !== $emailCanonical && $subscription->getEmailCanonical() === $emailCanonical;
     }
 }

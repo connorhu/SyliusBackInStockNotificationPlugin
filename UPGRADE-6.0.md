@@ -127,3 +127,22 @@ The `down()` removes subscriptions without a variant, since the old schema canno
 - `SubscriptionRepositoryInterface` gains `countAllActiveHolds()`, `findActiveByVisitor()`, `queuePosition()` (1 + earlier waiting pre-orders of the same target and
   channel, rule in `State\QueuePosition`), `activeHoldDeadlinesByProduct()` (latest active hold per product, one query) and
   `accountSummary()` (active count and whether any is actionable).
+
+## Neutral UI, account page and admin grid
+
+- The account page `webgriffe_back_in_stock_notification_account_list_subscriptions` is now served by `Controller\AccountController` instead
+  of the Sylius resource controller and the grid `webgriffe_back_in_stock_notification_account_list_subscriptions` is removed (the page
+  has per-state rows). New POST routes: `..._account_cancel` (`/account/back-in-stock-notification/{id}/cancel`), `..._account_restore`
+  and `..._account_dismiss`, protected by the CSRF id `webgriffe_bisn_account`. The hookable `grid` of the account page is replaced by
+  `list`. `SubscriptionRepositoryInterface` gains `createForAccountQueryBuilder()` and `queuePositions()` (positions of a whole list in one query).
+- `AddNotificationComponent` renders from `PreorderStateResolver`; its constructor takes the resolver, the pre-orderability resolver, the
+  repository and `CancelUndoSession`, and has the live actions `cancel` and `restore`. The product-page template is replaced: override
+  `templates/shop/product/show/content/info/summary/add_notification.html.twig` if you customised it.
+- Admin grid: the columns `product_variant_code` and `name` are replaced by `product`, `variant`, `name` (the subscriber), `status`,
+  `hold_until`; filters `code` is replaced by `product` (product code) and `channel`; the cancel action posts to
+  `webgriffe_admin_back_in_stock_notification_subscription_cancel` (CSRF id `webgriffe_bisn_admin_cancel`).
+- New bundle option `display_timezone` and Twig functions `webgriffe_bisn_view`, `webgriffe_bisn_account_summary`,
+  `webgriffe_bisn_hold_deadlines`, `webgriffe_bisn_timezone`. Requires `twig/intl-extra` (already a Sylius dependency).
+- Translations: complete `en` and `hu` (`webgriffe_bisn.product_page.*`, `my_account_section.*`, `admin.*`, `status.*`; flash
+  `webgriffe_bisn.admin.cancelled`). Removed `my_account_section.product/option/actions/simple` and `admin.notified/not-notified` from `en`.
+- Behat: the account scenario cancels (`I cancel the first subscription`) and sees the undo bar instead of deleting.

@@ -1,12 +1,79 @@
 {% import '@SyliusShop/shared/buttons.html.twig' as buttons %}
 {% form_theme form '@SyliusShop/form/theme.html.twig' %}
 
-<div class="card my-3" {{ attributes }}>
-    {% if this.preorderable and not sylius_inventory_is_available(variant) %}
+{#
+    One block for every pre-order state of the product for the current visitor (see PreorderState). Sellable and
+    not pre-orderable products render nothing; the state is resolved first, so an in-stock product costs no further lookup.
+#}
+{% set view = this.view %}
+{% set state = view.state.value %}
+
+{% set show = cancelled
+    or (notificationSent and not isCustomerLoggedIn)
+    or state in ['held_for_you', 'preordered', 'can_preorder']
+    or (state == 'held_for_others' and this.preorderable) %}
+
+{# The live component root stays in the page for every state; the card is drawn only when there is something to show. #}
+<div {{ attributes }} data-webgriffe-bisn-state="{{ state }}">
+{% if show %}<div class="card my-3">{% endif %}
+    {% if cancelled %}
+        <div class="card-body">
+            <div class="alert alert-info d-flex justify-content-between align-items-center mb-0" role="status">
+                <span>{{ 'webgriffe_bisn.product_page.cancelled'|trans }}</span>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-action="live#action" data-live-action-param="restore">
+                    {{ 'webgriffe_bisn.product_page.undo'|trans }}
+                </button>
+            </div>
+        </div>
+    {% elseif notificationSent and not isCustomerLoggedIn %}
+        <div class="card-body">
+            <div class="alert alert-success mb-0" {{ sylius_test_html_attribute('sylius-flash-message') }}>{{ 'webgriffe_bisn.form_submission.subscription_successfully'|trans }}</div>
+        </div>
+    {% elseif state == 'held_for_you' %}
+        <div class="card-body">
+            <p class="mb-2">
+                <span class="badge text-bg-success">{{ 'webgriffe_bisn.product_page.held_for_you_label'|trans }}</span>
+                {{ 'webgriffe_bisn.product_page.held_for_you'|trans({'{until}': view.holdUntil|format_datetime('medium', 'short', timezone=webgriffe_bisn_timezone())}) }}
+            </p>
+            {% if this.canCancel %}
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-action="live#action" data-live-action-param="cancel">
+                    {{ 'webgriffe_bisn.product_page.cancel'|trans }}
+                </button>
+            {% endif %}
+        </div>
+    {% elseif state == 'preordered' %}
+        {% set subscription = view.subscription %}
+        <div class="card-body">
+            <p class="mb-2">
+                <span class="badge text-bg-primary" {{ sylius_test_html_attribute('preordered') }}>{{ 'webgriffe_bisn.product_page.preordered'|trans }}</span>
+                {% if subscription.status == 'notified' %}
+                    {{ 'webgriffe_bisn.product_page.arrived'|trans }}
+                {% elseif view.position is same as(1) %}
+                    {{ 'webgriffe_bisn.product_page.next_in_line'|trans }}
+                {% elseif view.position is not null %}
+                    {{ 'webgriffe_bisn.product_page.in_line'|trans({'{position}': view.position}) }}
+                {% endif %}
+            </p>
+            {% if this.canCancel %}
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-action="live#action" data-live-action-param="cancel">
+                    {{ 'webgriffe_bisn.product_page.cancel'|trans }}
+                </button>
+            {% else %}
+                <p class="small text-muted mb-0">{{ 'webgriffe_bisn.product_page.guest_manage_hint'|trans }}</p>
+            {% endif %}
+        </div>
+    {% elseif state == 'can_preorder' or (state == 'held_for_others' and this.preorderable) %}
         <div class="card-body">
             <h5>{{ 'webgriffe_bisn.product_page.stock_notify_title'|trans }}:</h5>
-            {% if notificationSent %}
-                <div class="alert alert-success" {{ sylius_test_html_attribute('sylius-flash-message') }}>{{ 'webgriffe_bisn.form_submission.subscription_successfully'|trans }}</div>
+            {% if state == 'held_for_others' %}
+                {% set deadline = this.holdDeadline %}
+                <p class="text-muted">
+                    {% if deadline is not null %}
+                        {{ 'webgriffe_bisn.product_page.held_for_others'|trans({'{until}': deadline|format_datetime('medium', 'short', timezone=webgriffe_bisn_timezone())}) }}
+                    {% else %}
+                        {{ 'webgriffe_bisn.product_page.held_for_others_no_date'|trans }}
+                    {% endif %}
+                </p>
             {% endif %}
             {% if rateLimitedMinutes is not null %}
                 <div class="alert alert-warning" role="alert">
@@ -37,4 +104,5 @@
             {{ form_end(form, {'render_rest': false}) }}
         </div>
     {% endif %}
+{% if show %}</div>{% endif %}
 </div>

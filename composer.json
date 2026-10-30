@@ -34,6 +34,7 @@
         "symfony/ux-twig-component": "^2.7",
         "symfony/validator": "^6.4 || ^7.3",
         "symfony/webpack-encore-bundle": "^2.2",
+        "twig/intl-extra": "^3.16",
         "twig/twig": "^2.0 || ^3.0",
         "webmozart/assert": "^1.10"
     },

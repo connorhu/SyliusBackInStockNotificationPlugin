@@ -332,6 +332,76 @@ final class SubscriptionRepository extends EntityRepository implements Subscript
         return ['active' => (int) $row['active'], 'actionable' => (int) $row['actionable'] > 0];
     }
 
+    public function createForAccountQueryBuilder(CustomerInterface $customer, ChannelInterface $channel): QueryBuilder
+    {
+        $queryBuilder = $this
+            ->createQueryBuilder('subscription')
+            ->andWhere('subscription.channel = :channel')
+            ->andWhere('subscription.status != :cancelled')
+            ->andWhere('subscription.dismissedAt IS NULL')
+            ->setParameter('channel', $channel)
+            ->setParameter('cancelled', SubscriptionStatus::CANCELLED)
+            ->addOrderBy('subscription.createdAt', 'DESC')
+            ->addOrderBy('subscription.id', 'DESC')
+        ;
+        $emailCanonical = $customer->getEmailCanonical();
+        if (null === $emailCanonical || '' === $emailCanonical) {
+            $queryBuilder->andWhere('subscription.customer = :customer');
+        } else {
+            $queryBuilder
+                ->andWhere('subscription.customer = :customer OR (subscription.customer IS NULL AND subscription.emailCanonical = :emailCanonical)')
+                ->setParameter('emailCanonical', $emailCanonical)
+            ;
+        }
+
+        return $queryBuilder->setParameter('customer', $customer);
+    }
+
+    public function queuePositions(array $subscriptions): array
+    {
+        $ids = [];
+        foreach ($subscriptions as $subscription) {
+            /** @psalm-suppress MixedAssignment */
+            $id = $subscription->getId();
+            if (is_int($id) && SubscriptionStatus::WAITING === $subscription->getStatus()) {
+                $ids[] = $id;
+            }
+        }
+        if ([] === $ids) {
+            return [];
+        }
+
+        // The same rule as QueuePosition::among(): earlier (createdAt, then id) waiting pre-orders of the same target.
+        $earlier = $this->getEntityManager()->createQueryBuilder()
+            ->select('COUNT(earlier.id)')
+            ->from($this->getEntityName(), 'earlier')
+            ->andWhere('earlier.status = :waiting')
+            ->andWhere('earlier.channel = subscription.channel')
+            ->andWhere('earlier.product = subscription.product')
+            ->andWhere('(earlier.productVariant IS NULL AND subscription.productVariant IS NULL) OR earlier.productVariant = subscription.productVariant')
+            ->andWhere('earlier.createdAt < subscription.createdAt OR (earlier.createdAt = subscription.createdAt AND earlier.id < subscription.id)')
+        ;
+
+        /** @var list<array{id: int|string, earlierCount: int|string}> $rows */
+        $rows = $this
+            ->createQueryBuilder('subscription')
+            ->select('subscription.id AS id', sprintf('(%s) AS earlierCount', $earlier->getDQL()))
+            ->andWhere('subscription.id IN (:ids)')
+            ->andWhere('subscription.status = :waiting')
+            ->setParameter('ids', $ids)
+            ->setParameter('waiting', SubscriptionStatus::WAITING)
+            ->getQuery()
+            ->getArrayResult()
+        ;
+
+        $positions = [];
+        foreach ($rows as $row) {
+            $positions[(int) $row['id']] = (int) $row['earlierCount'] + 1;
+        }
+
+        return $positions;
+    }
+
     private function createEmailQueryBuilder(string $emailCanonical, ChannelInterface $channel): QueryBuilder
     {
         return $this

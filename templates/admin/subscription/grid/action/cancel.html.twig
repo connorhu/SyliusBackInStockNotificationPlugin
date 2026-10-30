@@ -1,0 +1,8 @@
+{% if data.active %}
+    <form method="post" action="{{ path('webgriffe_admin_back_in_stock_notification_subscription_cancel', {'id': data.id}) }}">
+        <input type="hidden" name="_token" value="{{ csrf_token('webgriffe_bisn_admin_cancel') }}">
+        <button type="submit" class="btn btn-icon" title="{{ action.label|trans }}" data-bs-toggle="tooltip" data-bs-title="{{ action.label|trans }}">
+            {{ ux_icon(action.icon|default('tabler:bell-off')) }}
+        </button>
+    </form>
+{% endif %}
