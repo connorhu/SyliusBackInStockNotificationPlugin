@@ -81,6 +81,14 @@ interface SubscriptionRepositoryInterface extends RepositoryInterface
     public function countActiveHoldsByVariant(array $variants, \DateTimeImmutable $now): array;
 
     /**
+     * Active holds (notified, holdUntil > now) on every variant in every channel, keyed by variant id (one query; active
+     * holds are few). Variants without a hold are left out.
+     *
+     * @return array<int, int>
+     */
+    public function countAllActiveHolds(\DateTimeImmutable $now): array;
+
+    /**
      * Active (waiting or notified) pre-orders of a visitor in every channel: those of the customer, those without a customer
      * whose canonical e-mail is the given one, and the given ids. Null/empty criteria are left out.
      *

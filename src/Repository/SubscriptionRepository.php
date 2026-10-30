@@ -173,20 +173,39 @@ final class SubscriptionRepository extends EntityRepository implements Subscript
             return [];
         }
 
-        /** @var list<array{variantId: int|string, holds: int|string}> $rows */
-        $rows = $this
+        return $this->countHolds(
+            $this->createActiveHoldsQueryBuilder($now)
+                ->andWhere('subscription.heldVariant IN (:variants)')
+                ->setParameter('variants', $variants),
+        );
+    }
+
+    public function countAllActiveHolds(\DateTimeImmutable $now): array
+    {
+        return $this->countHolds($this->createActiveHoldsQueryBuilder($now));
+    }
+
+    private function createActiveHoldsQueryBuilder(\DateTimeImmutable $now): QueryBuilder
+    {
+        return $this
             ->createQueryBuilder('subscription')
             ->select('IDENTITY(subscription.heldVariant) AS variantId', 'COUNT(subscription.id) AS holds')
-            ->andWhere('subscription.heldVariant IN (:variants)')
+            ->andWhere('subscription.heldVariant IS NOT NULL')
             ->andWhere('subscription.status = :notified')
             ->andWhere('subscription.holdUntil > :now')
-            ->setParameter('variants', $variants)
             ->setParameter('notified', SubscriptionStatus::NOTIFIED)
             ->setParameter('now', $now)
             ->groupBy('subscription.heldVariant')
-            ->getQuery()
-            ->getArrayResult()
         ;
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function countHolds(QueryBuilder $queryBuilder): array
+    {
+        /** @var list<array{variantId: int|string, holds: int|string}> $rows */
+        $rows = $queryBuilder->getQuery()->getArrayResult();
 
         $counts = [];
         foreach ($rows as $row) {

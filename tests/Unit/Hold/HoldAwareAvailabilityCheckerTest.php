@@ -39,6 +39,8 @@ final class HoldAwareAvailabilityCheckerTest extends TestCase
 
     private int $holdCountQueries = 0;
 
+    private int $visitorQueries = 0;
+
     private RequestStack $requestStack;
 
     private Channel $channel;
@@ -156,6 +158,27 @@ final class HoldAwareAvailabilityCheckerTest extends TestCase
         self::assertFalse($holder->isStockSufficient($variant, 4));
     }
 
+    public function testCheckingManyVariantsCostsOneHoldQueryAndOneVisitorQuery(): void
+    {
+        $this->customer = $this->customer('anna@example.com');
+        $variants = [];
+        for ($i = 0; $i < 24; ++$i) {
+            $variants[] = $this->variant(2);
+        }
+        $this->hold($this->subscription('bela@example.com'), $variants[3]);
+        $this->hold($this->subscription('cecil@example.com'), $variants[3]);
+        $checker = $this->checker();
+
+        foreach ($variants as $variant) {
+            $checker->isStockAvailable($variant);
+            $checker->isStockSufficient($variant, 2);
+        }
+
+        self::assertFalse($checker->isStockAvailable($variants[3]));
+        self::assertSame(1, $this->holdCountQueries);
+        self::assertSame(1, $this->visitorQueries);
+    }
+
     public function testUntrackedVariantDelegates(): void
     {
         $variant = $this->variant(0);
@@ -200,12 +223,12 @@ final class HoldAwareAvailabilityCheckerTest extends TestCase
     private function repository(): SubscriptionRepositoryInterface&MockObject
     {
         $repository = $this->createMock(SubscriptionRepositoryInterface::class);
-        $repository->method('countActiveHoldsByVariant')->willReturnCallback(function (array $variants, \DateTimeImmutable $now): array {
+        $repository->method('countAllActiveHolds')->willReturnCallback(function (\DateTimeImmutable $now): array {
             ++$this->holdCountQueries;
             $counts = [];
             foreach ($this->subscriptions as $subscription) {
                 $held = $subscription->getHeldVariant();
-                if ($subscription->isActive() && null !== $held && $subscription->getHoldUntil() > $now && in_array($held, $variants, true)) {
+                if ($subscription->isActive() && null !== $held && $subscription->getHoldUntil() > $now) {
                     $counts[(int) $held->getId()] = ($counts[(int) $held->getId()] ?? 0) + 1;
                 }
             }
@@ -213,6 +236,8 @@ final class HoldAwareAvailabilityCheckerTest extends TestCase
             return $counts;
         });
         $repository->method('findActiveByVisitor')->willReturnCallback(function (?CustomerInterface $customer, ?string $emailCanonical, array $ids): array {
+            ++$this->visitorQueries;
+
             return array_values(array_filter($this->subscriptions, static function (SubscriptionInterface $subscription) use ($customer, $emailCanonical, $ids): bool {
                 if (!$subscription->isActive()) {
                     return false;

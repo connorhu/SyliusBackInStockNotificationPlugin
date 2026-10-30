@@ -14,7 +14,10 @@ use Webgriffe\SyliusBackInStockNotificationPlugin\Target\TargetResolverInterface
 
 /**
  * The current shop visitor as a pre-order owner: the logged-in customer (its pre-orders, and the guest ones of its
- * canonical e-mail) plus the pre-orders claimed in this session. The lookup is memoised per request.
+ * canonical e-mail) plus the pre-orders claimed in this session. The lookup is one query, memoised per request.
+ *
+ * A claim stays in the session after the hold ends: while that pre-order is still `notified` its holder keeps the right
+ * every notified pre-order of the target has (spec: earlier holders may buy held units).
  */
 final class HoldVisitor implements ResetInterface
 {
@@ -70,14 +73,34 @@ final class HoldVisitor implements ResetInterface
             if ($this->holdsActively($subscription, $variant, $now)) {
                 return true;
             }
-            foreach ($this->targetResolver->variantsOf($subscription) as $targetVariant) {
-                if (self::sameVariant($targetVariant, $variant)) {
-                    return true;
-                }
+            if ($this->targetContains($subscription, $variant)) {
+                return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * Same answer as TargetResolverInterface::variantsOf() containing the variant, without loading the product's variants.
+     */
+    private function targetContains(SubscriptionInterface $subscription, ProductVariantInterface $variant): bool
+    {
+        if (TargetResolverInterface::TARGET_VARIANT === $this->targetResolver->target()) {
+            $targetVariant = $subscription->getProductVariant();
+
+            return null !== $targetVariant && self::sameVariant($targetVariant, $variant);
+        }
+
+        $product = $subscription->getProduct();
+        $variantProduct = $variant->getProduct();
+        if (null === $product || null === $variantProduct) {
+            return false;
+        }
+        /** @psalm-suppress MixedAssignment */
+        $productId = $product->getId();
+
+        return $product === $variantProduct || (null !== $productId && $productId === $variantProduct->getId());
     }
 
     public function holdsActively(SubscriptionInterface $subscription, ProductVariantInterface $variant, \DateTimeImmutable $now): bool

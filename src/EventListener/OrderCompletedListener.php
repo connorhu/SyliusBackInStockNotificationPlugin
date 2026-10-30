@@ -18,7 +18,8 @@ use Webgriffe\SyliusBackInStockNotificationPlugin\Target\TargetResolverInterface
 /**
  * A placed order fulfils the active pre-orders of its customer (or, for pre-orders without a customer, of its canonical
  * e-mail) whose target contains an ordered variant; their holds are released. It never breaks the checkout: any
- * failure is logged.
+ * failure is logged. The order is already committed when the event runs; a failing flush closes the shared entity
+ * manager, which later listeners of the same event would notice.
  */
 final class OrderCompletedListener
 {

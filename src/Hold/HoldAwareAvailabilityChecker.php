@@ -14,12 +14,13 @@ use Webgriffe\SyliusBackInStockNotificationPlugin\Repository\SubscriptionReposit
 
 /**
  * Decorates Sylius' availability checker for shop requests: units held for other pre-orders are not available to the
- * visitor. Admin, API, CLI (and so the restock run) get the plain answer. Hold counts are memoised per request.
+ * visitor. Admin, API, CLI (and so the restock run) get the plain answer. Every active hold count is loaded with one
+ * query on first use and memoised for the request (listing pages check many variants).
  */
 final class HoldAwareAvailabilityChecker implements AvailabilityCheckerInterface, ResetInterface
 {
-    /** @var array<int, int> */
-    private array $holds = [];
+    /** @var array<int, int>|null variant id => active holds; null until loaded */
+    private ?array $holds = null;
 
     public function __construct(
         private AvailabilityCheckerInterface $decoratedChecker,
@@ -54,7 +55,7 @@ final class HoldAwareAvailabilityChecker implements AvailabilityCheckerInterface
 
     public function reset(): void
     {
-        $this->holds = [];
+        $this->holds = null;
     }
 
     private function holdsOn(ProductVariantInterface $variant, \DateTimeImmutable $now): int
@@ -64,10 +65,8 @@ final class HoldAwareAvailabilityChecker implements AvailabilityCheckerInterface
         if (!is_int($id)) {
             return 0;
         }
-        if (!isset($this->holds[$id])) {
-            $this->holds[$id] = $this->subscriptionRepository->countActiveHoldsByVariant([$variant], $now)[$id] ?? 0;
-        }
+        $this->holds ??= $this->subscriptionRepository->countAllActiveHolds($now);
 
-        return $this->holds[$id];
+        return $this->holds[$id] ?? 0;
     }
 }

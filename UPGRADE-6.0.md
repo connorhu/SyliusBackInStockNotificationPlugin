@@ -107,7 +107,10 @@ The `down()` removes subscriptions without a variant, since the old schema canno
   (`SellableUnits` keeps its own undecorated instance). If you decorate the checker yourself, mind the decoration priority.
 - The visitor (`HoldVisitor`) is the logged-in customer (pre-orders with that customer, or without a customer and with its canonical e-mail)
   plus the pre-orders claimed in this session (`ClaimSession`, key `webgriffe_bisn_claims`; reading never starts a session). Both services
-  memoise per request and are tagged `kernel.reset`.
+  memoise per request and are tagged `kernel.reset`: the checker loads every active hold count with one query
+  (`SubscriptionRepositoryInterface::countAllActiveHolds()`) and the visitor's pre-orders with one more, however many variants a page
+  checks. A claim stays in the session after the hold ends; while that pre-order is still `notified` its holder keeps the right every
+  notified pre-order of the target has (buying held units).
 - New route `webgriffe_back_in_stock_notification_claim` (`GET /back-in-stock-notification/claim/{hash}`, shop routing): the signed link
   (`ClaimLinkGenerator`, hash + `expires` = the end of the hold, `UriSigner`) marks the pre-order as claimed in the session and redirects to
   the product page; an invalid or expired link redirects there with the info flash `webgriffe_bisn.claim.expired` (new `flashes` domain).
@@ -116,10 +119,11 @@ The `down()` removes subscriptions without a variant, since the old schema canno
   constructor argument.
 - `OrderCompletedListener` listens to **`sylius.order.post_complete`**: the active pre-orders of the order's customer (or, without a
   customer, of its canonical e-mail) whose target contains an ordered variant become `fulfilled` (hold released). A failure is logged as
-  `webgriffe_bisn.order_fulfilment_failed` and never breaks the checkout. Orders completed through the API do not dispatch this event.
+  `webgriffe_bisn.order_fulfilment_failed` and never breaks the checkout (the order is already committed; a failing flush closes the shared
+  entity manager, which later `post_complete` listeners would notice). Orders completed through the API do not dispatch this event.
 - `PreorderStateResolver::resolve($product, $variant, $channel)` (`webgriffe.resolver.preorder_state`) returns a `PreorderView`
   (`state`: `PreorderState` enum `NotPreorderable`, `CanPreorder`, `Preordered`, `HeldForYou`, `HeldForOthers`, `Sellable`; `subscription`,
   `holdUntil`, `position`). A guest's own pre-orders of this session (`GuestPreorderSession`) resolve as `Preordered`.
-- `SubscriptionRepositoryInterface` gains `findActiveByVisitor()`, `queuePosition()` (1 + earlier waiting pre-orders of the same target and
+- `SubscriptionRepositoryInterface` gains `countAllActiveHolds()`, `findActiveByVisitor()`, `queuePosition()` (1 + earlier waiting pre-orders of the same target and
   channel, rule in `State\QueuePosition`), `activeHoldDeadlinesByProduct()` (latest active hold per product, one query) and
   `accountSummary()` (active count and whether any is actionable).
