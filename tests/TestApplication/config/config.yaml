@@ -4,6 +4,7 @@ imports:
 
 doctrine:
     dbal:
-        # Symfony Messenger (enabled by the Sylius test application) manages its own table and
-        # its indexes differ from what the schema tool generates on PostgreSQL; not plugin code.
-        schema_filter: '~^(?!messenger_messages$)~'
+        # Symfony Messenger (enabled by the Sylius test application) manages the messenger_messages
+        # table itself; its indexes differ from what the schema tool generates on PostgreSQL. The
+        # prefix also covers the messenger_messages_id_seq sequence. Not plugin code.
+        schema_filter: '~^(?!messenger_messages)~'
