@@ -1,0 +1,16 @@
+{% set form = hookable_metadata.context.form %}
+
+{% if form.preorderMode is defined %}
+    <div class="card g-col-12 g-col-xl-6">
+        <div class="card-header">
+            <div class="card-title">{{ 'webgriffe_bisn.admin.channel.section'|trans }}</div>
+        </div>
+
+        <div class="card-body">
+            {{ form_row(form.preorderEnabledByDefault) }}
+            {{ form_row(form.preorderMode) }}
+            {{ form_row(form.preorderHoldHours) }}
+            {{ form_row(form.preorderRateLimitSeconds) }}
+        </div>
+    </div>
+{% endif %}

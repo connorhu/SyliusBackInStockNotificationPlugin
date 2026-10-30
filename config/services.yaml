@@ -59,6 +59,8 @@ services:
             - '@Webgriffe\SyliusBackInStockNotificationPlugin\Processor\SubscriptionProcessor'
             - '@sylius.repository.product'
             - '@sylius.repository.product_variant'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Preorderability\PreorderabilityResolver'
+            - '@sylius.context.channel'
         tags:
             - { name: 'sylius.live_component.shop', key: 'webgriffe:sylius_shop:product:add_notification' }
 
@@ -67,3 +69,16 @@ services:
         arguments:
             - '%webgriffe.model.back_in_stock_notification_subscription.class%'
             - '@sylius.canonicalizer'
+
+    Webgriffe\SyliusBackInStockNotificationPlugin\Preorderability\PreorderabilityResolver: ~
+
+    webgriffe.resolver.preorderability: '@Webgriffe\SyliusBackInStockNotificationPlugin\Preorderability\PreorderabilityResolver'
+
+    Webgriffe\SyliusBackInStockNotificationPlugin\Form\Extension\ProductPreorderTypeExtension:
+        tags: [ 'form.type_extension' ]
+
+    Webgriffe\SyliusBackInStockNotificationPlugin\Form\Extension\TaxonPreorderTypeExtension:
+        tags: [ 'form.type_extension' ]
+
+    Webgriffe\SyliusBackInStockNotificationPlugin\Form\Extension\ChannelPreorderTypeExtension:
+        tags: [ 'form.type_extension' ]

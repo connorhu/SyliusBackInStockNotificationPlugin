@@ -8,6 +8,8 @@ use Sylius\Bundle\ShopBundle\Twig\Component\Product\AddToCartFormComponent;
 use Sylius\Bundle\ShopBundle\Twig\Component\Product\Trait\ProductLivePropTrait;
 use Sylius\Bundle\ShopBundle\Twig\Component\Product\Trait\ProductVariantLivePropTrait;
 use Sylius\Bundle\UiBundle\Twig\Component\TemplatePropTrait;
+use Sylius\Component\Channel\Context\ChannelContextInterface;
+use Sylius\Component\Core\Model\ChannelInterface;
 use Sylius\Component\Core\Model\ProductVariantInterface;
 use Sylius\Component\Core\Repository\ProductRepositoryInterface;
 use Sylius\Component\Core\Repository\ProductVariantRepositoryInterface;
@@ -25,6 +27,7 @@ use Symfony\UX\LiveComponent\ComponentWithFormTrait;
 use Symfony\UX\LiveComponent\DefaultActionTrait;
 use Symfony\UX\TwigComponent\Attribute\PostMount;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Form\SubscriptionType;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Preorderability\PreorderabilityResolverInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Processor\SubscriptionProcessorInterface;
 use Webmozart\Assert\Assert;
 
@@ -51,9 +54,23 @@ final class AddNotificationComponent
         protected readonly SubscriptionProcessorInterface $subscriptionProcessor,
         ProductRepositoryInterface $productRepository,
         ProductVariantRepositoryInterface $productVariantRepository,
+        protected readonly PreorderabilityResolverInterface $preorderabilityResolver,
+        protected readonly ChannelContextInterface $channelContext,
     ) {
         $this->initializeProduct($productRepository);
         $this->initializeProductVariant($productVariantRepository);
+    }
+
+    /**
+     * Whether new subscriptions are accepted for the product in the current channel (the block renders nothing otherwise).
+     */
+    public function isPreorderable(): bool
+    {
+        $channel = $this->channelContext->getChannel();
+        Assert::isInstanceOf($channel, ChannelInterface::class);
+        Assert::notNull($this->product);
+
+        return $this->preorderabilityResolver->isPreorderable($this->product, $channel);
     }
 
     protected function instantiateForm(): FormInterface

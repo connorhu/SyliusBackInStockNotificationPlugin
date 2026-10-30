@@ -67,6 +67,46 @@ bin/console sylius:theme:assets:install
 bin/console cache:clear
 ```
 
+## Pre-orderability (optional)
+
+Whether the notification/pre-order block shows on a product page is decided per product, per category (taxon) and per channel:
+a product's own setting (`inherit`, `allowed`, `forbidden`) wins unless it inherits; then the product's categories decide (each
+category's own setting or its nearest ancestor's; any `forbidden` beats `allowed`); if everything inherits, the channel default applies
+(enabled by default). Entities that do not implement the interfaces below simply count as `inherit` / the channel defaults.
+
+To get the admin fields, make your entities implement the interfaces and use the traits (the traits carry Doctrine ORM attributes, so
+the entities must be attribute-mapped), then run the plugin migrations:
+
+```php
+class Product extends BaseProduct implements PreorderabilityAwareInterface
+{
+    use ProductPreorderabilityTrait;
+}
+
+class Taxon extends BaseTaxon implements PreorderabilityAwareInterface
+{
+    use TaxonPreorderabilityTrait;
+}
+
+class Channel extends BaseChannel implements PreorderChannelSettingsInterface
+{
+    use PreorderChannelSettingsTrait;
+}
+```
+
+(all in `Webgriffe\SyliusBackInStockNotificationPlugin\Entity`). If your entities are mapped in XML, map the columns yourself instead of using
+the traits' attributes, e.g. for the product (the trait provides the property and accessors; leave the attributes out by implementing the
+property yourself):
+
+```xml
+<field name="preorderability" column="preorderability" type="string" length="16" enum-type="Webgriffe\SyliusBackInStockNotificationPlugin\Preorderability\Preorderability">
+    <options><option name="default">inherit</option></options>
+</field>
+```
+
+and for the channel `preorder_enabled_by_default` (boolean, default `true`), `preorder_mode` (string 16, default `queue`),
+`preorder_hold_hours` (integer, default `24`), `preorder_rate_limit_seconds` (integer, default `120`).
+
 ## Configuration
 
 This module sends mail using a Symfony Command. Unfortunately, the command line context does not know about your VirtualHost or domain name. To fix this, the Command loads the hostname from the Subscription's channel, if nothing set it defaults to `localhost`. In console commands, URLs use http by default. You can change this globally with these configuration parameters:
