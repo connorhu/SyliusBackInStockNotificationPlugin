@@ -12,6 +12,7 @@ use Sylius\Component\Core\Model\ChannelInterface;
 use Sylius\Component\Customer\Context\CustomerContextInterface;
 use Sylius\Component\Mailer\Sender\SenderInterface;
 use Sylius\Component\User\Canonicalizer\Canonicalizer;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Session\Session;
@@ -29,6 +30,7 @@ use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\Subscription;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionStatus;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Mailer\SafeSender;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Manage\ManageLinkGenerator;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Manage\ManageLinkMailer;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Manage\ManageSession;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Repository\SubscriptionRepositoryInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Session\CancelUndoSession;
@@ -46,6 +48,18 @@ final class ManageControllerTest extends TestCase
     private RequestStack $requestStack;
 
     private Session $session;
+
+    private ChannelInterface&MockObject $channel;
+
+    private CsrfTokenManagerInterface&MockObject $csrf;
+
+    private CustomerContextInterface&MockObject $customerContext;
+
+    private bool $csrfValid = true;
+
+    private ManageLinkGenerator $links;
+
+    private ManageLinkMailer $linkMailer;
 
     private ManageController $controller;
 
@@ -73,7 +87,7 @@ final class ManageControllerTest extends TestCase
     {
         $this->manageSession->grant('a@b.hu', new \DateTimeImmutable('+1 hour'));
         // The lookup is scoped to the granted e-mail, so another person's pre-order is simply not found.
-        $this->repository->expects(self::once())->method('findOneByHashAndEmail')->with('hash', 'a@b.hu')->willReturn(null);
+        $this->repository->expects(self::once())->method('findOneByHashAndEmail')->with('hash', 'a@b.hu', $this->channel)->willReturn(null);
         $this->repository->expects(self::never())->method('add');
 
         $this->expectException(NotFoundHttpException::class);
@@ -100,7 +114,7 @@ final class ManageControllerTest extends TestCase
         $this->manageSession->grant('a@b.hu', new \DateTimeImmutable('+1 hour'));
         $one = $this->subscription(1);
         $two = $this->subscription(2);
-        $this->repository->expects(self::once())->method('findActiveByEmail')->with('a@b.hu', self::anything())->willReturn([$one, $two]);
+        $this->repository->expects(self::once())->method('findActiveByEmail')->with('a@b.hu', $this->channel)->willReturn([$one, $two]);
         $this->repository->expects(self::exactly(2))->method('add');
 
         $this->controller->deleteAllAction($this->post());
@@ -119,7 +133,7 @@ final class ManageControllerTest extends TestCase
         $two->markCancelled(new \DateTimeImmutable());
         $this->push($this->post());
         $this->undoSession->remember([1, 2], new \DateTimeImmutable('-9 minutes'));
-        $this->repository->expects(self::once())->method('findCancelledByIds')->with([1, 2], 'a@b.hu')->willReturn([$one, $two]);
+        $this->repository->expects(self::once())->method('findCancelledByIds')->with([1, 2], 'a@b.hu', $this->channel)->willReturn([$one, $two]);
         $this->repository->expects(self::exactly(2))->method('add');
 
         $this->controller->restoreAction($this->post());
@@ -134,28 +148,44 @@ final class ManageControllerTest extends TestCase
         $this->push($this->post());
         $this->undoSession->remember([1], new \DateTimeImmutable('-11 minutes'));
         $this->repository->expects(self::never())->method('add');
-        $this->repository->method('findCancelledByIds')->willReturn([]);
+        $this->repository->expects(self::once())->method('findCancelledByIds')->with([], 'a@b.hu', $this->channel)->willReturn([]);
 
         $this->controller->restoreAction($this->post());
     }
 
-    public function testNewLinkRequestAlwaysAnswersSent(): void
+    public function testNewLinkRequestAnswersTheSameAndSendsNothingInTheRequest(): void
     {
-        // Unknown e-mail: no pre-orders, no mail, same redirect.
-        $this->repository->method('findActiveByEmail')->willReturnOnConsecutiveCalls([], [$this->subscription(1)], [$this->subscription(1)]);
-        $this->mailSender->expects(self::once())->method('send');
+        // The lookup and the mail run on kernel.terminate: during the request the repository is never asked.
+        $this->repository->expects(self::never())->method('findActiveByEmail');
+        $this->mailSender->expects(self::never())->method('send');
 
         $unknown = $this->controller->requestAction($this->post(['email' => 'nobody@b.hu']));
         $known = $this->controller->requestAction($this->post(['email' => 'a@b.hu']));
-        // The e-mail limiter (1 per minute) is used up: same redirect, no second mail.
+        // The e-mail limiter (1 per minute) is used up: same redirect again.
         $limited = $this->controller->requestAction($this->post(['email' => 'a@b.hu']));
 
-        self::assertSame('/sent', $unknown->headers->get('Location'));
-        self::assertSame('/sent', $known->headers->get('Location'));
-        self::assertSame('/sent', $limited->headers->get('Location'));
+        foreach ([$unknown, $known, $limited] as $response) {
+            self::assertSame(302, $response->getStatusCode());
+            self::assertSame('/sent', $response->headers->get('Location'));
+        }
     }
 
-    public function testIpLimiterBlocksMailButStillAnswersSent(): void
+    public function testNewLinkMailGoesOutOnTerminateOnlyForEligibleAddresses(): void
+    {
+        $this->repository->method('findActiveByEmail')->willReturnCallback(
+            fn (string $email): array => 'a@b.hu' === $email ? [$this->subscription(1)] : [],
+        );
+        $this->mailSender->expects(self::once())->method('send');
+
+        $this->controller->requestAction($this->post(['email' => 'nobody@b.hu']));
+        $this->controller->requestAction($this->post(['email' => 'a@b.hu']));
+        // Limited by the e-mail limiter: not deferred.
+        $this->controller->requestAction($this->post(['email' => 'a@b.hu']));
+        $this->linkMailer->onTerminate();
+        $this->linkMailer->onTerminate();
+    }
+
+    public function testIpLimiterStopsDeferredMailsButStillAnswersSent(): void
     {
         $this->repository->method('findActiveByEmail')->willReturn([$this->subscription(1)]);
         $this->mailSender->expects(self::exactly(10))->method('send');
@@ -164,6 +194,114 @@ final class ManageControllerTest extends TestCase
             $response = $this->controller->requestAction($this->post(['email' => "user$i@b.hu"]));
             self::assertSame('/sent', $response->headers->get('Location'));
         }
+        $this->linkMailer->onTerminate();
+    }
+
+    public function testRequestWithBadCsrfTokenIsRefused(): void
+    {
+        $this->csrfValid = false;
+        $this->mailSender->expects(self::never())->method('send');
+
+        $response = $this->controller->requestAction($this->post(['email' => 'a@b.hu']));
+        $this->linkMailer->onTerminate();
+
+        self::assertSame(422, $response->getStatusCode());
+    }
+
+    public function testDeleteRefusedWithBadCsrfToken(): void
+    {
+        $this->manageSession->grant('a@b.hu', new \DateTimeImmutable('+1 hour'));
+        $this->csrfValid = false;
+        $this->repository->expects(self::never())->method('add');
+
+        $this->expectException(AccessDeniedHttpException::class);
+        $this->controller->deleteAction($this->post(), 'hash');
+    }
+
+    public function testRestoreAndDeleteAllRefusedWithoutGrant(): void
+    {
+        $this->repository->expects(self::never())->method('add');
+
+        foreach ([[$this->controller, 'restoreAction'], [$this->controller, 'deleteAllAction']] as $callable) {
+            try {
+                $callable($this->post());
+                self::fail('The action must be refused');
+            } catch (AccessDeniedHttpException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+    }
+
+    public function testValidLinkGrantsUntilItsExpiryAndRedirectsToTheCleanUrl(): void
+    {
+        $issued = new \DateTimeImmutable('-1 hour');
+        $url = $this->links->generate('a@b.hu', $issued, 'hu_HU');
+        $request = $this->getWithSession($url);
+
+        $response = $this->controller->manageAction($request);
+
+        self::assertInstanceOf(RedirectResponse::class, $response);
+        self::assertSame('/x', $response->headers->get('Location'));
+        $expires = $issued->modify('+24 hours');
+        self::assertSame('a@b.hu', $this->manageSession->grantedEmail($expires->modify('-1 minute')));
+        self::assertNull($this->manageSession->grantedEmail($expires->modify('+1 second')));
+    }
+
+    /**
+     * @dataProvider badLinks
+     */
+    public function testInvalidTamperedOrExpiredLinkAnswers410WithoutGrant(string $kind): void
+    {
+        $now = new \DateTimeImmutable();
+        $url = match ($kind) {
+            'expired' => $this->links->generate('a@b.hu', $now->modify('-25 hours'), 'hu_HU'),
+            'tampered' => str_replace('a%40b.hu', 'c%40d.hu', $this->links->generate('a@b.hu', $now, 'hu_HU')),
+            default => 'https://shop.test/hu/back-in-stock-notification/manage?_hash=garbage&email=a%40b.hu&expires=' . ($now->getTimestamp() + 3600),
+        };
+
+        $response = $this->controller->manageAction($this->getWithSession($url));
+
+        self::assertSame(410, $response->getStatusCode());
+        self::assertNull($this->manageSession->grantedEmail($now));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function badLinks(): iterable
+    {
+        yield 'expired' => ['expired'];
+        yield 'tampered' => ['tampered'];
+        yield 'garbage signature' => ['garbage'];
+    }
+
+    public function testLoggedInCustomerOpeningOwnLinkGoesToTheAccountListWithoutGrant(): void
+    {
+        $customer = $this->createMock(\Sylius\Component\Core\Model\CustomerInterface::class);
+        $customer->method('getEmail')->willReturn('A@B.hu');
+        $this->customerContext->method('getCustomer')->willReturn($customer);
+        $url = $this->links->generate('a@b.hu', new \DateTimeImmutable(), 'hu_HU');
+
+        $response = $this->controller->manageAction($this->getWithSession($url));
+
+        self::assertInstanceOf(RedirectResponse::class, $response);
+        self::assertSame('/account', $response->headers->get('Location'));
+        self::assertNull($this->manageSession->grantedEmail(new \DateTimeImmutable()));
+    }
+
+    public function testBareVisitWithoutGrantAnswers403(): void
+    {
+        self::assertSame(403, $this->controller->manageAction($this->getWithSession('https://shop.test/hu/back-in-stock-notification/manage'))->getStatusCode());
+    }
+
+    private function getWithSession(string $url): Request
+    {
+        $request = Request::create($url);
+        $request->setSession($this->session);
+        $request->setLocale('hu_HU');
+        $this->push($request);
+
+        return $request;
     }
 
     private function subscription(int $id): Subscription
@@ -197,30 +335,38 @@ final class ManageControllerTest extends TestCase
 
     private function buildController(): ManageController
     {
-        $channel = $this->createMock(ChannelInterface::class);
+        $this->channel = $this->createMock(ChannelInterface::class);
         $channelContext = $this->createMock(ChannelContextInterface::class);
-        $channelContext->method('getChannel')->willReturn($channel);
-        $csrf = $this->createMock(CsrfTokenManagerInterface::class);
-        $csrf->method('isTokenValid')->willReturn(true);
+        $channelContext->method('getChannel')->willReturn($this->channel);
+        $this->csrf = $this->createMock(CsrfTokenManagerInterface::class);
+        $this->csrf->method('isTokenValid')->willReturnCallback(fn (): bool => $this->csrfValid);
         $router = $this->createMock(UrlGeneratorInterface::class);
         $router->method('generate')->willReturnCallback(
-            static fn (string $name): string => str_ends_with($name, 'link_sent') ? '/sent' : '/x',
+            static fn (string $name, array $parameters = []): string => match (true) {
+                str_ends_with($name, 'link_sent') => '/sent',
+                str_ends_with($name, 'account_list_subscriptions') => '/account',
+                str_ends_with($name, '_manage') && isset($parameters['email']) => 'https://shop.test/hu/back-in-stock-notification/manage?' . http_build_query($parameters),
+                default => '/x',
+            },
         );
         $twig = $this->createMock(Environment::class);
         $twig->method('render')->willReturn('');
+        $this->customerContext = $this->createMock(CustomerContextInterface::class);
+        $this->links = new ManageLinkGenerator($router, new UriSigner('secret'));
+        $this->linkMailer = new ManageLinkMailer($this->repository, $this->links, new SafeSender($this->mailSender, new NullLogger()));
 
         return new ManageController(
             $twig,
             $router,
-            $csrf,
+            $this->csrf,
             $this->repository,
-            new ManageLinkGenerator($router, new UriSigner('secret')),
+            $this->links,
             $this->manageSession,
             $this->undoSession,
-            $this->createMock(CustomerContextInterface::class),
+            $this->customerContext,
             $channelContext,
             new Canonicalizer(),
-            new SafeSender($this->mailSender, new NullLogger()),
+            $this->linkMailer,
             new RateLimiterFactory(['id' => 'email', 'policy' => 'fixed_window', 'limit' => 1, 'interval' => '60 seconds'], new InMemoryStorage()),
             new RateLimiterFactory(['id' => 'ip', 'policy' => 'sliding_window', 'limit' => 10, 'interval' => '1 hour'], new InMemoryStorage()),
         );

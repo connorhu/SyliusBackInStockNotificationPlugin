@@ -47,12 +47,12 @@ interface SubscriptionRepositoryInterface extends RepositoryInterface
      */
     public function findActiveByEmail(string $emailCanonical, ChannelInterface $channel): array;
 
-    public function findOneByHashAndEmail(string $hash, string $emailCanonical): ?SubscriptionInterface;
+    public function findOneByHashAndEmail(string $hash, string $emailCanonical, ChannelInterface $channel): ?SubscriptionInterface;
 
     /**
      * @param list<int> $ids
      *
      * @return list<SubscriptionInterface>
      */
-    public function findCancelledByIds(array $ids, string $emailCanonical): array;
+    public function findCancelledByIds(array $ids, string $emailCanonical, ChannelInterface $channel): array;
 }

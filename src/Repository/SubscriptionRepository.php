@@ -80,15 +80,15 @@ final class SubscriptionRepository extends EntityRepository implements Subscript
         return $result;
     }
 
-    public function findOneByHashAndEmail(string $hash, string $emailCanonical): ?SubscriptionInterface
+    public function findOneByHashAndEmail(string $hash, string $emailCanonical, ChannelInterface $channel): ?SubscriptionInterface
     {
         /** @var SubscriptionInterface|null $result */
-        $result = $this->findOneBy(['hash' => $hash, 'emailCanonical' => $emailCanonical]);
+        $result = $this->findOneBy(['hash' => $hash, 'emailCanonical' => $emailCanonical, 'channel' => $channel]);
 
         return $result;
     }
 
-    public function findCancelledByIds(array $ids, string $emailCanonical): array
+    public function findCancelledByIds(array $ids, string $emailCanonical, ChannelInterface $channel): array
     {
         if ([] === $ids) {
             return [];
@@ -100,6 +100,8 @@ final class SubscriptionRepository extends EntityRepository implements Subscript
             ->andWhere('subscription.id IN (:ids)')
             ->andWhere('subscription.emailCanonical = :emailCanonical')
             ->andWhere('subscription.status = :cancelled')
+            ->andWhere('subscription.channel = :channel')
+            ->setParameter('channel', $channel)
             ->setParameter('ids', $ids)
             ->setParameter('emailCanonical', $emailCanonical)
             ->setParameter('cancelled', SubscriptionStatus::CANCELLED)

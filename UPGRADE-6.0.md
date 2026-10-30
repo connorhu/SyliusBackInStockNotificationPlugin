@@ -70,3 +70,5 @@ The `down()` removes subscriptions without a variant, since the old schema canno
 - `SubscriptionProcessor` takes the `ManageLinkGenerator` as a new constructor argument (after the router); the confirmation mail's
   `manageUrl` is now filled for guest pre-orders.
 - `SubscriptionRepositoryInterface` gains `findManageableByEmail()`, `findActiveByEmail()`, `findOneByHashAndEmail()` and `findCancelledByIds()`.
+- The "new link" mail is sent on `kernel.terminate` by `ManageLinkMailer` (lookup included), so the request's timing does not reveal whether an
+  address has pre-orders. `findOneByHashAndEmail()` and `findCancelledByIds()` take the channel as an extra argument.

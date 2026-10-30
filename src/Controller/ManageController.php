@@ -17,8 +17,8 @@ use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Security\Csrf\CsrfToken;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 use Twig\Environment;
-use Webgriffe\SyliusBackInStockNotificationPlugin\Mailer\SafeSender;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Manage\ManageLinkGenerator;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Manage\ManageLinkMailer;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Manage\ManageSession;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Repository\SubscriptionRepositoryInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Session\CancelUndoSession;
@@ -45,7 +45,7 @@ final class ManageController
         private CustomerContextInterface $customerContext,
         private ChannelContextInterface $channelContext,
         private CanonicalizerInterface $canonicalizer,
-        private SafeSender $sender,
+        private ManageLinkMailer $linkMailer,
         private RateLimiterFactory $emailLimiterFactory,
         private RateLimiterFactory $ipLimiterFactory,
     ) {
@@ -81,10 +81,13 @@ final class ManageController
             return $this->render('expired', [], Response::HTTP_FORBIDDEN);
         }
 
+        $channel = $this->channelContext->getChannel();
+
         return $this->render('index', [
             'email' => $email,
-            'subscriptions' => $this->subscriptionRepository->findManageableByEmail($email, $this->channelContext->getChannel()),
-            'undoCount' => count($this->cancelUndoSession->peek($now)),
+            'subscriptions' => $this->subscriptionRepository->findManageableByEmail($email, $channel),
+            // Only ids that are still cancelled and belong to this e-mail count; the memory is shared with other pages.
+            'undoCount' => count($this->subscriptionRepository->findCancelledByIds($this->cancelUndoSession->peek($now), $email, $channel)),
         ]);
     }
 
@@ -93,7 +96,7 @@ final class ManageController
         $now = new \DateTimeImmutable();
         $email = $this->grantedEmailForPost($request, $now);
 
-        $subscription = $this->subscriptionRepository->findOneByHashAndEmail($hash, $email);
+        $subscription = $this->subscriptionRepository->findOneByHashAndEmail($hash, $email, $this->channelContext->getChannel());
         if (null === $subscription) {
             throw new NotFoundHttpException();
         }
@@ -136,7 +139,7 @@ final class ManageController
         $now = new \DateTimeImmutable();
         $email = $this->grantedEmailForPost($request, $now);
 
-        foreach ($this->subscriptionRepository->findCancelledByIds($this->cancelUndoSession->take($now), $email) as $subscription) {
+        foreach ($this->subscriptionRepository->findCancelledByIds($this->cancelUndoSession->take($now), $email, $this->channelContext->getChannel()) as $subscription) {
             $subscription->restore();
             $this->subscriptionRepository->add($subscription);
         }
@@ -156,23 +159,12 @@ final class ManageController
         }
 
         $emailCanonical = $this->canonical($email);
-        // Both limiters are consumed whether or not the address has pre-orders, so the answer never depends on it.
-        $allowed = $this->emailLimiterFactory->create($emailCanonical)->consume()->isAccepted() &&
-            $this->ipLimiterFactory->create($request->getClientIp() ?? 'unknown')->consume()->isAccepted();
-
-        $channel = $this->channelContext->getChannel();
-        if ($allowed && [] !== $this->subscriptionRepository->findActiveByEmail($emailCanonical, $channel)) {
-            $localeCode = $request->getLocale();
-            $this->sender->send(
-                'webgriffe_back_in_stock_notification_manage_link',
-                $email,
-                [
-                    'manageUrl' => $this->linkGenerator->generate($emailCanonical, new \DateTimeImmutable(), $localeCode),
-                    'ttlHours' => 24,
-                ],
-                $channel,
-                $localeCode,
-            );
+        // Both limiters are consumed whether or not the address has pre-orders. The lookup and the mail itself run
+        // after the response (kernel.terminate), so neither the answer nor its timing depends on the address.
+        $emailAccepted = $this->emailLimiterFactory->create($emailCanonical)->consume()->isAccepted();
+        $ipAccepted = $this->ipLimiterFactory->create($request->getClientIp() ?? 'unknown')->consume()->isAccepted();
+        if ($emailAccepted && $ipAccepted) {
+            $this->linkMailer->defer($email, $emailCanonical, $this->channelContext->getChannel(), $request->getLocale());
         }
 
         return new RedirectResponse($this->router->generate('webgriffe_back_in_stock_notification_manage_link_sent', ['_locale' => $request->getLocale()]));
