@@ -8,3 +8,28 @@ doctrine:
         # table itself; its indexes differ from what the schema tool generates on PostgreSQL. The
         # prefix also covers the messenger_messages_id_seq sequence. Not plugin code.
         schema_filter: '~^(?!messenger_messages)~'
+    orm:
+        mappings:
+            WebgriffeBackInStockTestApplication:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/../../../tests/TestApplication/src/Entity'
+                prefix: 'Tests\Webgriffe\SyliusBackInStockNotificationPlugin\TestApplication\Entity'
+
+sylius_product:
+    resources:
+        product:
+            classes:
+                model: Tests\Webgriffe\SyliusBackInStockNotificationPlugin\TestApplication\Entity\Product
+
+sylius_taxonomy:
+    resources:
+        taxon:
+            classes:
+                model: Tests\Webgriffe\SyliusBackInStockNotificationPlugin\TestApplication\Entity\Taxon
+
+sylius_channel:
+    resources:
+        channel:
+            classes:
+                model: Tests\Webgriffe\SyliusBackInStockNotificationPlugin\TestApplication\Entity\Channel
