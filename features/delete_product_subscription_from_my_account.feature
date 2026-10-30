@@ -1,5 +1,5 @@
 @customer_account
-Feature: Ability to delete a particular subscription from my account
+Feature: Ability to cancel a particular pre-order from my account
 
   Background:
     Given the store operates on a single channel in "United States"
@@ -8,13 +8,12 @@ Feature: Ability to delete a particular subscription from my account
     And there is a customer "Francis Underwood" identified by an email "francis@underwood.com" and a password "whitehouse"
     And I am logged in as "francis@underwood.com"
 
-  # The account page offers no delete since the manage page replaced the GET delete route; round 8 brings the cancel action back.
-  @ui @javascript @pending_account_ui
-  Scenario: Being able to delete a subscription from my account
+  @ui @javascript
+  Scenario: Being able to cancel a pre-order from my account
     When I view product "Knitted cap apple"
     And I subscribe to the alert list for the product "Knitted cap apple"
     And I browse to my product subscriptions
     Then I should see only one subscription
-    And I delete the first subscription
-    Then I should be notified that the subscription has been successfully deleted
+    And I cancel the first subscription
+    Then I should be able to undo the cancellation
     And there should be no subscriptions
