@@ -34,10 +34,11 @@ services:
 
     Webgriffe\SyliusBackInStockNotificationPlugin\Validator\SubscriptionUniqueValidator:
         arguments:
-            - '@webgriffe.repository.back_in_stock_notification_subscription'
+            - '@webgriffe.resolver.target'
             - '@sylius.repository.product_variant'
             - '@sylius.context.customer'
             - '@sylius.canonicalizer'
+            - '@sylius.context.channel'
         tags:
             - { name: validator.constraint_validator }
 
@@ -47,7 +48,26 @@ services:
             - '@webgriffe.repository.back_in_stock_notification_subscription'
             - '@sylius.context.channel.cached'
             - '@sylius.context.locale'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Mailer\SafeSender'
+            - '@webgriffe.resolver.target'
+            - '@webgriffe.resolver.preorderability'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Customer\AccountCustomerFinder'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Session\GuestPreorderSession'
+            - '@router'
+            - '@sylius.canonicalizer'
+
+    Webgriffe\SyliusBackInStockNotificationPlugin\Mailer\SafeSender:
+        arguments:
             - '@sylius.email_sender'
+            - '@monolog.logger'
+
+    Webgriffe\SyliusBackInStockNotificationPlugin\Customer\AccountCustomerFinder:
+        arguments:
+            - '@sylius.repository.customer'
+
+    Webgriffe\SyliusBackInStockNotificationPlugin\Session\GuestPreorderSession:
+        arguments:
+            - '@request_stack'
 
     webgriffe.processor.subscription: '@Webgriffe\SyliusBackInStockNotificationPlugin\Processor\SubscriptionProcessor'
 
@@ -61,6 +81,7 @@ services:
             - '@sylius.repository.product_variant'
             - '@Webgriffe\SyliusBackInStockNotificationPlugin\Preorderability\PreorderabilityResolver'
             - '@sylius.context.channel'
+            - '@request_stack'
         tags:
             - { name: 'sylius.live_component.shop', key: 'webgriffe:sylius_shop:product:add_notification' }
 

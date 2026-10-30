@@ -22,10 +22,15 @@ webgriffe_bisn:
     product_page:
         stock_notify_title: 'Get an email notification when the product return in stock'
         form_action: 'Notify me'
+        name: 'Your name'
     subscription_mail:
-        subscription_title: 'Product not available'
-        subscription_message: 'Your request has been registered, we will send you an email as soon as the product <a href="{url}">{product}</a> is back in stock.'
-        subscription_unsub: 'Were not you the one who subscribed to these notifications? <a href="{url}" target="_blank">Click here</a> to delete yourself.'
+        subscription_title: 'Your pre-order is registered'
+        subscription_message: 'Your request has been registered: we will write to you as soon as <a href="{url}">{product}</a> can be bought.'
+        next_queue: 'What happens next: when a copy arrives, the first one in line gets it held for {hours} hours.'
+        next_fastest: 'What happens next: when a copy arrives, everyone waiting is notified and the quickest to order gets it.'
+        manage_action: 'Manage my pre-orders'
+        account_action: 'Open my account'
+        not_you: 'If this wasn''t you, <a href="{url}" target="_blank">delete it here</a>.'
     alert_email:
         alert_title: 'Product available again'
         alert_message: 'We inform you that the product {product} is back in stock'

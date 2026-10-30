@@ -38,3 +38,20 @@ The `down()` removes subscriptions without a variant, since the old schema canno
   (the traits do it), otherwise `doctrine:schema:validate` reports them as unmapped.
 - `AddNotificationComponent` takes two more constructor arguments (the `PreorderabilityResolverInterface` and the channel context);
   the block renders nothing when the product is not pre-orderable in the current channel.
+
+## Guest pre-orders and the processor (BC break)
+
+- `SubscriptionProcessorInterface::process()` is now
+  `process(ProductInterface $product, ?ProductVariantInterface $variant, string $email, ?string $name, ?CustomerInterface $customer, ?string $clientIp = null): ProcessResult`.
+  `ProcessResult` is an enum: `Created`, `AlreadySubscribed`, `NotPreorderable`, `RateLimited`. The processor refuses products that are
+  not pre-orderable in the current channel, treats e-mail addresses case-insensitively, and attaches the pre-order to the customer when the
+  address belongs to a registered account (a customer with a shop user). A logged-in customer's own e-mail wins over the typed one.
+  `SubscriptionProcessor` takes new constructor arguments (SafeSender, target resolver, pre-orderability resolver, `AccountCustomerFinder`,
+  `GuestPreorderSession`, router, canonicalizer); if you redefined the service, copy the new arguments from `config/services.yaml`.
+- The confirmation e-mail (`webgriffe_back_in_stock_notification_success_subscription`) gets the variables `subscription`, `product`, `mode`,
+  `holdHours`, `manageUrl` and `accountUrl`; the translation key `subscription_unsub` is replaced by `not_you`. Mails go through `SafeSender`,
+  which logs `webgriffe_bisn.mail_failed` instead of throwing.
+- `SubscriptionType` gains the `name` field and an unmapped honeypot `website`; the `ask_identity` option (default `true`) turns the `name` and
+  `email` fields off for a logged-in customer. `AddNotificationComponent` takes the request stack as last constructor argument.
+- `SubscriptionUniqueValidator` now takes the target resolver (instead of the repository) first and the channel context last.
+- `GuestPreorderSession` remembers the ids of the pre-orders a guest created (session key `webgriffe_bisn_guest_preorders`).

@@ -1,0 +1,5 @@
+webgriffe_bisn:
+    subscription:
+        already_saved: 'Ezzel az e-mail-címmel már van előjegyzés'
+        not_preorderable: 'Ez a termék nem jegyezhető elő.'
+        rate_limited: 'Pár perc múlva jegyezhetsz elő újra.'

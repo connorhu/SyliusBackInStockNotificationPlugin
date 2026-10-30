@@ -1,4 +1,14 @@
 webgriffe_bisn:
+    product_page:
+        name: 'Neved'
+    subscription_mail:
+        subscription_title: 'Az előjegyzésed rögzítettük'
+        subscription_message: 'Rögzítettük a kérésedet: értesítünk, amint a(z) <a href="{url}">{product}</a> megvásárolható.'
+        next_queue: 'Mi történik ezután: amikor példány érkezik, a sor elején állónak {hours} óráig félretesszük.'
+        next_fastest: 'Mi történik ezután: amikor példány érkezik, minden várakozó értesítést kap, és a leggyorsabb rendelő kapja meg.'
+        manage_action: 'Előjegyzéseim kezelése'
+        account_action: 'Fiókom megnyitása'
+        not_you: 'Ha nem te voltál, <a href="{url}" target="_blank">itt törölheted</a>.'
     admin:
         preorderability:
             label: 'Előjegyzés'

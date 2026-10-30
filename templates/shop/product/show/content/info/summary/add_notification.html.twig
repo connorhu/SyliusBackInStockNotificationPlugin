@@ -13,10 +13,17 @@
             {{ form_errors(form) }}
 
             {% if not isCustomerLoggedIn %}
+                {{ form_widget(form.name, sylius_test_form_attribute('name')|sylius_merge_recursive({'attr': {'placeholder': 'webgriffe_bisn.product_page.name'|trans ~ '...', 'class': 'mb-2'}})) }}
                 {{ form_widget(form.email, sylius_test_form_attribute('email')|sylius_merge_recursive({'attr': {'placeholder': 'sylius.ui.email'|trans ~ '...'}})) }}
             {% endif %}
 
             {{ form_row(form.product_variant_code) }}
+
+            {% if not isCustomerLoggedIn %}
+                <div style="position: absolute; left: -10000px;" aria-hidden="true">
+                    {{ form_widget(form.website) }}
+                </div>
+            {% endif %}
 
             {{ buttons.submit('webgriffe_bisn.product_page.form_action'|trans, 'add-notification', 'tabler:bell', 'btn-primary mt-2') }}
 

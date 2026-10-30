@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Webgriffe\SyliusBackInStockNotificationPlugin\Validator;
 
+use Sylius\Component\Channel\Context\ChannelContextInterface;
+use Sylius\Component\Core\Model\ChannelInterface;
 use Sylius\Component\Core\Model\CustomerInterface;
+use Sylius\Component\Core\Model\ProductInterface;
 use Sylius\Component\Core\Model\ProductVariantInterface;
 use Sylius\Component\Core\Repository\ProductVariantRepositoryInterface;
 use Sylius\Component\Customer\Context\CustomerContextInterface;
@@ -13,8 +16,7 @@ use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
 use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 use Symfony\Component\Validator\Exception\UnexpectedValueException;
-use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionStatus;
-use Webgriffe\SyliusBackInStockNotificationPlugin\Repository\SubscriptionRepositoryInterface;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Target\TargetResolverInterface;
 
 /**
  * @psalm-suppress PropertyNotSetInConstructor
@@ -22,10 +24,11 @@ use Webgriffe\SyliusBackInStockNotificationPlugin\Repository\SubscriptionReposit
 final class SubscriptionUniqueValidator extends ConstraintValidator
 {
     public function __construct(
-        private SubscriptionRepositoryInterface $subscriptionRepository,
+        private TargetResolverInterface $targetResolver,
         private ProductVariantRepositoryInterface $productVariantRepository,
         private CustomerContextInterface $customerContext,
         private CanonicalizerInterface $canonicalizer,
+        private ChannelContextInterface $channelContext,
     ) {
     }
 
@@ -64,11 +67,15 @@ final class SubscriptionUniqueValidator extends ConstraintValidator
             return;
         }
 
-        if ([] !== $this->subscriptionRepository->findBy([
-            'emailCanonical' => $this->canonicalizer->canonicalize(trim($email)),
-            'productVariant' => $productVariant,
-            'status' => SubscriptionStatus::ACTIVE,
-        ])) {
+        $product = $productVariant->getProduct();
+        $channel = $this->channelContext->getChannel();
+        $emailCanonical = $this->canonicalizer->canonicalize(trim($email));
+        if (!$product instanceof ProductInterface || !$channel instanceof ChannelInterface || null === $emailCanonical) {
+            return;
+        }
+
+        $variant = TargetResolverInterface::TARGET_VARIANT === $this->targetResolver->target() ? $productVariant : null;
+        if (null !== $this->targetResolver->findActive($emailCanonical, $product, $variant, $channel)) {
             $this->context
                 ->buildViolation($constraint->message)
                 ->addViolation()

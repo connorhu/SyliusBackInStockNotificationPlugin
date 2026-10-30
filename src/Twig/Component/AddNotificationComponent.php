@@ -16,8 +16,10 @@ use Sylius\Component\Core\Repository\ProductVariantRepositoryInterface;
 use Sylius\Component\Customer\Context\CustomerContextInterface;
 use Sylius\Component\Product\Resolver\ProductVariantResolverInterface;
 use Sylius\TwigHooks\LiveComponent\HookableLiveComponentTrait;
+use Symfony\Component\Form\FormError;
 use Symfony\Component\Form\FormFactoryInterface;
 use Symfony\Component\Form\FormInterface;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\UX\LiveComponent\Attribute\AsLiveComponent;
 use Symfony\UX\LiveComponent\Attribute\LiveAction;
 use Symfony\UX\LiveComponent\Attribute\LiveArg;
@@ -28,6 +30,7 @@ use Symfony\UX\LiveComponent\DefaultActionTrait;
 use Symfony\UX\TwigComponent\Attribute\PostMount;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Form\SubscriptionType;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Preorderability\PreorderabilityResolverInterface;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Processor\ProcessResult;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Processor\SubscriptionProcessorInterface;
 use Webmozart\Assert\Assert;
 
@@ -56,6 +59,7 @@ final class AddNotificationComponent
         ProductVariantRepositoryInterface $productVariantRepository,
         protected readonly PreorderabilityResolverInterface $preorderabilityResolver,
         protected readonly ChannelContextInterface $channelContext,
+        protected readonly RequestStack $requestStack,
     ) {
         $this->initializeProduct($productRepository);
         $this->initializeProductVariant($productVariantRepository);
@@ -75,7 +79,11 @@ final class AddNotificationComponent
 
     protected function instantiateForm(): FormInterface
     {
-        return $this->formFactory->create(SubscriptionType::class);
+        $customer = $this->customerContext->getCustomer();
+
+        return $this->formFactory->create(SubscriptionType::class, null, [
+            'ask_identity' => null === $customer || null === $customer->getEmail(),
+        ]);
     }
 
     #[PostMount]
@@ -111,24 +119,36 @@ final class AddNotificationComponent
     {
         $this->notificationSent = false;
         $this->formValues['product_variant_code'] = $this->variant?->getCode();
-        if ($this->isCustomerLoggedIn) {
-            $this->formValues['email'] = $this->customerContext->getCustomer()?->getEmail();
-        }
         $this->submitForm();
 
-        Assert::isInstanceOf($this->variant, ProductVariantInterface::class);
+        Assert::notNull($this->product);
 
         $formData = $this->getForm()->getData();
         Assert::isArray($formData);
-        $email = $formData['email'] ?? null;
+        $customer = $this->customerContext->getCustomer();
+        $email = $formData['email'] ?? $customer?->getEmail();
         Assert::stringNotEmpty($email);
-
-        $this->subscriptionProcessor->process(
+        $result = $this->subscriptionProcessor->process(
+            $this->product,
             $this->variant,
             $email,
-            $this->customerContext->getCustomer(),
+            isset($formData['name']) && is_string($formData['name']) ? $formData['name'] : null,
+            $customer,
+            $this->requestStack->getCurrentRequest()?->getClientIp(),
         );
 
+        if (ProcessResult::NotPreorderable === $result) {
+            $this->getForm()->addError(new FormError('webgriffe_bisn.subscription.not_preorderable'));
+
+            return;
+        }
+        if (ProcessResult::RateLimited === $result) {
+            $this->getForm()->addError(new FormError('webgriffe_bisn.subscription.rate_limited'));
+
+            return;
+        }
+
+        // An already pre-ordered address gets the same answer, so the form never reveals who has pre-ordered.
         $this->notificationSent = true;
         $this->resetForm();
     }
