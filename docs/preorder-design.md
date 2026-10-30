@@ -49,7 +49,7 @@ command, live component) and extend it in **scoped rounds**.
 1. **Package identity.** The fork keeps the upstream package name, namespace
    (`Webgriffe\SyliusBackInStockNotificationPlugin`) and table prefix, so every round stays a readable
    diff against upstream and fixes can be offered back. etnobook requires it from the VCS repository
-   at `dev-main` (like the SimplePay plugin). The spec is copied into the fork's `docs/` in round 1 so
+   at `dev-master` (the fork's default branch is `master`). The spec is copied into the fork's `docs/` in round 1 so
    the egyházzene session reads the same document.
 2. **Target: product or variant**, a bundle config option `target: product|variant` (default
    `variant` = upstream behaviour). etnobook uses `product` (one copy = one variant; a new copy is
@@ -206,7 +206,7 @@ fork. Rounds stack (each PR bases on the previous one); one merge run at the end
 
 ## etnobook wiring (Hungarian PR in etnobook, after the fork rounds)
 
-- `composer.json`: VCS repository + `webgriffe/sylius-back-in-stock-notification-plugin: dev-main`;
+- `composer.json`: VCS repository + `webgriffe/sylius-back-in-stock-notification-plugin: dev-master`;
   bundle + routes registered; `target: product`.
 - `App\Entity\Channel\Channel`, `Product\Product`, `Taxonomy\Taxon` use the plugin traits; one app
   migration if the plugin's migrations do not cover the app entity columns (builder decides with the
