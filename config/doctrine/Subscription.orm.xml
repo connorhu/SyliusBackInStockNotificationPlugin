@@ -8,6 +8,11 @@
     <mapped-superclass name="Webgriffe\SyliusBackInStockNotificationPlugin\Entity\Subscription"
                        table="webgriffe_back_in_stock_notification_subscription">
 
+        <indexes>
+            <index name="idx_bisn_product_status_created" columns="product_id,status,created_at"/>
+            <index name="idx_bisn_email_canonical" columns="email_canonical"/>
+        </indexes>
+
         <id name="id" column="id" type="integer">
             <generator strategy="AUTO"/>
         </id>
@@ -25,14 +30,36 @@
             <gedmo:timestampable on="update"/>
         </field>
 
-        <field name="notify" column="notify" type="boolean" nullable="false"/>
+        <field name="emailCanonical" type="string" column="email_canonical"/>
+
+        <field name="name" type="string" column="name" nullable="true"/>
+
+        <field name="status" type="string" column="status" length="16"/>
+
+        <field name="notifiedAt" column="notified_at" type="datetime_immutable" nullable="true"/>
+
+        <field name="holdUntil" column="hold_until" type="datetime_immutable" nullable="true"/>
+
+        <field name="fulfilledAt" column="fulfilled_at" type="datetime_immutable" nullable="true"/>
+
+        <field name="cancelledAt" column="cancelled_at" type="datetime_immutable" nullable="true"/>
+
+        <field name="dismissedAt" column="dismissed_at" type="datetime_immutable" nullable="true"/>
 
         <many-to-one field="customer" target-entity="Sylius\Component\Customer\Model\CustomerInterface">
             <join-column name="customer_id"/>
         </many-to-one>
 
+        <many-to-one field="product" target-entity="Sylius\Component\Core\Model\ProductInterface">
+            <join-column name="product_id" nullable="false" on-delete="CASCADE"/>
+        </many-to-one>
+
         <many-to-one field="productVariant" target-entity="Sylius\Component\Core\Model\ProductVariantInterface">
-            <join-column name="product_variant_id" nullable="false"/>
+            <join-column name="product_variant_id" nullable="true" on-delete="CASCADE"/>
+        </many-to-one>
+
+        <many-to-one field="heldVariant" target-entity="Sylius\Component\Core\Model\ProductVariantInterface">
+            <join-column name="held_variant_id" nullable="true" on-delete="SET NULL"/>
         </many-to-one>
 
         <many-to-one field="channel" target-entity="Sylius\Component\Channel\Model\ChannelInterface">

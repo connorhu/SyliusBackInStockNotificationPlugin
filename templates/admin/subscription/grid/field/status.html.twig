@@ -1,7 +1,12 @@
-{% if data %}
+{% if data == 'notified' or data == 'fulfilled' %}
     <span class="badge text-bg-success">
         {{ ux_icon('tabler:bell', {class: 'icon icon-sm'}) }}
         {{ 'webgriffe_bisn.admin.notified'|trans }}
+    </span>
+{% elseif data == 'cancelled' %}
+    <span class="badge text-bg-secondary">
+        {{ ux_icon('tabler:bell-off', {class: 'icon icon-sm'}) }}
+        {{ 'webgriffe_bisn.status.cancelled'|trans }}
     </span>
 {% else %}
     <span class="badge text-bg-danger">

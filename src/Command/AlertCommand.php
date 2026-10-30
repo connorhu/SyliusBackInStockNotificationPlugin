@@ -15,6 +15,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Routing\RouterInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionInterface;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionStatus;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Repository\SubscriptionRepositoryInterface;
 
 #[AsCommand(
@@ -44,7 +45,7 @@ final class AlertCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         //I think that this load in the long time can be a bottle necklace
-        $subscriptions = $this->backInStockNotificationRepository->findBy(['notify' => false]);
+        $subscriptions = $this->backInStockNotificationRepository->findBy(['status' => SubscriptionStatus::WAITING]);
         foreach ($subscriptions as $subscription) {
             $channel = $subscription->getChannel();
             $productVariant = $subscription->getProductVariant();
@@ -65,7 +66,7 @@ final class AlertCommand extends Command
             ) {
                 $this->router->getContext()->setHost($channel->getHostname() ?? 'localhost');
                 $this->sendEmail($subscription, $productVariant, $channel);
-                $subscription->setNotify(true);
+                $subscription->markNotified(new \DateTimeImmutable(), null, null);
                 $this->backInStockNotificationRepository->add($subscription);
             }
         }

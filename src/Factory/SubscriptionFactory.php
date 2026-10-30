@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Webgriffe\SyliusBackInStockNotificationPlugin\Factory;
 
 use Sylius\Component\Channel\Model\ChannelInterface;
+use Sylius\Component\Core\Model\ProductInterface;
 use Sylius\Component\Core\Model\ProductVariantInterface;
 use Sylius\Component\Customer\Model\CustomerInterface;
+use Sylius\Component\User\Canonicalizer\CanonicalizerInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionInterface;
 use Webmozart\Assert\Assert;
 
@@ -15,7 +17,7 @@ final readonly class SubscriptionFactory implements SubscriptionFactoryInterface
     /**
      * @param class-string $className
      */
-    public function __construct(private string $className)
+    public function __construct(private string $className, private CanonicalizerInterface $canonicalizer)
     {
     }
 
@@ -26,8 +28,10 @@ final readonly class SubscriptionFactory implements SubscriptionFactoryInterface
 
     public function createWithData(
         ChannelInterface $channel,
-        ProductVariantInterface $productVariant,
+        ProductInterface $product,
+        ?ProductVariantInterface $productVariant,
         string $email,
+        ?string $name,
         string $localeCode,
         ?CustomerInterface $customer = null,
     ): SubscriptionInterface {
@@ -36,8 +40,12 @@ final readonly class SubscriptionFactory implements SubscriptionFactoryInterface
         Assert::isInstanceOf($subscription, SubscriptionInterface::class);
 
         $subscription->setChannel($channel);
+        $subscription->setProduct($product);
         $subscription->setProductVariant($productVariant);
+        $email = trim($email);
         $subscription->setEmail($email);
+        $subscription->setEmailCanonical($this->canonicalizer->canonicalize($email));
+        $subscription->setName($name);
         $subscription->setLocaleCode($localeCode);
         $subscription->setCustomer($customer);
 

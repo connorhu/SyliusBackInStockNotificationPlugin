@@ -13,7 +13,7 @@ sylius_grid:
                 image:
                     type: twig
                     label: sylius.ui.image
-                    path: productVariant.product
+                    path: product
                     options:
                         template: "@SyliusAdmin/product/grid/field/product_image.html.twig"
                         vars:
@@ -27,7 +27,7 @@ sylius_grid:
                     type: string
                     label: sylius.ui.name
                     sortable: translation.name
-                    path: productVariant.product.name
+                    path: product.name
                 email:
                     type: string
                     label: sylius.ui.email
@@ -37,11 +37,11 @@ sylius_grid:
                     sortable: createdAt
                     options:
                         format: d-m-Y H:i:s
-                notify:
+                status:
                     type: twig
                     label: sylius.ui.state
                     options:
-                        template: "@WebgriffeSyliusBackInStockNotificationPlugin/admin/subscription/grid/field/notify.html.twig"
+                        template: "@WebgriffeSyliusBackInStockNotificationPlugin/admin/subscription/grid/field/status.html.twig"
             filters:
                 email:
                     type: string
@@ -54,9 +54,15 @@ sylius_grid:
                 created_at:
                     type: date
                     label: sylius.ui.date
-                notify:
-                    type: boolean
+                status:
+                    type: select
                     label: sylius.ui.state
+                    form_options:
+                        choices:
+                            webgriffe_bisn.status.waiting: waiting
+                            webgriffe_bisn.status.notified: notified
+                            webgriffe_bisn.status.fulfilled: fulfilled
+                            webgriffe_bisn.status.cancelled: cancelled
             actions:
                 item:
                     product_details:
@@ -66,7 +72,7 @@ sylius_grid:
                             link:
                                 route: sylius_admin_product_show
                                 parameters:
-                                    id: resource.productVariant.product.id
+                                    id: resource.product.id
                     customer_details:
                         label: webgriffe_bisn.admin.show_customer
                         type: customer_details
@@ -93,18 +99,18 @@ sylius_grid:
                 product:
                     type: twig
                     label: sylius.ui.product
-                    path: productVariant
+                    path: product
                     options:
                         template: "@WebgriffeSyliusBackInStockNotificationPlugin/shop/account/subscription/grid/field/product.html.twig"
                 product_variant_code:
                     type: string
                     label: sylius.ui.code
                     path: productVariant.code
-                notify:
+                status:
                     type: twig
                     label: sylius.ui.state
                     options:
-                        template: "@WebgriffeSyliusBackInStockNotificationPlugin/shop/account/subscription/grid/field/notify.html.twig"
+                        template: "@WebgriffeSyliusBackInStockNotificationPlugin/shop/account/subscription/grid/field/status.html.twig"
                 created_at:
                     type: datetime
                     label: sylius.ui.date
