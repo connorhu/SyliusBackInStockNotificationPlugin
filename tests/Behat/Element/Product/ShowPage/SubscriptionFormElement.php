@@ -10,6 +10,7 @@ final class SubscriptionFormElement extends Element implements SubscriptionFormE
 {
     public function submitFormAsAGuest(string $variant, string $email): void
     {
+        $this->getElement('add_name')->setValue('Behat Visitor');
         $this->getElement('add_email')->setValue($email);
         $this->getElement('submit_form')->click();
 
@@ -27,6 +28,7 @@ final class SubscriptionFormElement extends Element implements SubscriptionFormE
     {
         return array_merge(parent::getDefinedElements(), [
             'open_overlay' => '#trigger-notification-overlay',
+            'add_name' => '[data-live-name-value="webgriffe:sylius_shop:product:add_notification"] [data-test-name]',
             'add_email' => '[data-live-name-value="webgriffe:sylius_shop:product:add_notification"] [data-test-email]',
             'form' => '[data-live-name-value="webgriffe:sylius_shop:product:add_notification"]',
             'submit_form' => '[data-test-button="add-notification"]',
