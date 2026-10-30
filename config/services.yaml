@@ -8,13 +8,35 @@ services:
             - '@webgriffe.repository.back_in_stock_notification_subscription'
             - '@router'
     
-    Webgriffe\SyliusBackInStockNotificationPlugin\Controller\SubscriptionController:
+    Webgriffe\SyliusBackInStockNotificationPlugin\Controller\ManageController:
         tags: [ 'controller.service_arguments' ]
-        calls:
-            - [ setContainer, [ '@service_container' ] ]
         arguments:
-            - '@translator'
+            - '@twig'
+            - '@router'
+            - '@security.csrf.token_manager'
             - '@webgriffe.repository.back_in_stock_notification_subscription'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Manage\ManageLinkGenerator'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Manage\ManageSession'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Session\CancelUndoSession'
+            - '@sylius.context.customer'
+            - '@sylius.context.channel'
+            - '@sylius.canonicalizer'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Mailer\SafeSender'
+            - '@limiter.webgriffe_bisn_manage_link_email'
+            - '@limiter.webgriffe_bisn_manage_link_ip'
+
+    Webgriffe\SyliusBackInStockNotificationPlugin\Manage\ManageLinkGenerator:
+        arguments:
+            - '@router'
+            - '@uri_signer'
+
+    Webgriffe\SyliusBackInStockNotificationPlugin\Manage\ManageSession:
+        arguments:
+            - '@request_stack'
+
+    Webgriffe\SyliusBackInStockNotificationPlugin\Session\CancelUndoSession:
+        arguments:
+            - '@request_stack'
     
     Webgriffe\SyliusBackInStockNotificationPlugin\Menu\AccountMenuListener:
         tags:
@@ -44,6 +66,7 @@ services:
             - '@Webgriffe\SyliusBackInStockNotificationPlugin\Customer\AccountCustomerFinder'
             - '@Webgriffe\SyliusBackInStockNotificationPlugin\Session\GuestPreorderSession'
             - '@router'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Manage\ManageLinkGenerator'
             - '@sylius.canonicalizer'
             - '@monolog.logger'
 

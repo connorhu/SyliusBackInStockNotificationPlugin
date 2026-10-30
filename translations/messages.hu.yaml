@@ -9,6 +9,27 @@ webgriffe_bisn:
         manage_action: 'Előjegyzéseim kezelése'
         account_action: 'Fiókom megnyitása'
         not_you: 'Ha nem te voltál, <a href="{url}" target="_blank">itt törölheted</a>.'
+    manage:
+        title: 'Az előjegyzéseid'
+        intro: '{email} előjegyzései'
+        empty: 'Ehhez a címhez nincs kezelhető előjegyzés.'
+        delete: 'Törlés'
+        delete_all: 'Mindet törlöm'
+        deleted: 'Törölt előjegyzések: {count}.'
+        undo: 'Mégse'
+        expired_title: 'Ez a hivatkozás már nem érvényes'
+        expired_message: 'A kezelő hivatkozás 24 óráig érvényes. Küldhetünk egy újat.'
+        request_action: 'Új hivatkozást kérek'
+        request_title: 'Előjegyzéseid kezelése'
+        request_message: 'Add meg az e-mail-címet, amellyel előjegyeztél, és küldünk egy hivatkozást a kezeléséhez.'
+        request_error: 'Adj meg érvényes e-mail-címet, és próbáld újra.'
+        request_submit: 'Hivatkozás küldése'
+        sent_title: 'Nézd meg a postaládád'
+        sent_message: 'Ha ehhez a címhez van előjegyzés, elküldtük a kezelő hivatkozást. 24 óráig érvényes.'
+    manage_mail:
+        title: 'Előjegyzéseid kezelése'
+        message: 'Az alábbi gombbal láthatod és törölheted az előjegyzéseidet. A hivatkozás {hours} óráig érvényes.'
+        ignore: 'Ha nem te kérted ezt a levelet, nyugodtan hagyd figyelmen kívül.'
     admin:
         preorderability:
             label: 'Előjegyzés'

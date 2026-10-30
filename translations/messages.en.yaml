@@ -5,9 +5,6 @@ webgriffe:
 webgriffe_bisn:
     form_submission:
         subscription_successfully: 'Successfully subscribed, check your email!'
-    deletion_submission:
-        not-successful: 'Subscription not found'
-        successful: 'Mail is deleted from the notification alert list'
     my_account_section:
         menu_label: 'Products notification'
         title: 'Products notification'
@@ -35,6 +32,27 @@ webgriffe_bisn:
         alert_title: 'Product available again'
         alert_message: 'We inform you that the product {product} is back in stock'
         alert_action: 'Buy now'
+    manage:
+        title: 'Your pre-orders'
+        intro: 'Pre-orders for {email}'
+        empty: 'There are no pre-orders to manage for this address.'
+        delete: 'Delete'
+        delete_all: 'Delete all'
+        deleted: 'Pre-orders deleted: {count}.'
+        undo: 'Undo'
+        expired_title: 'This link is no longer valid'
+        expired_message: 'Manage links work for 24 hours. We can send you a new one.'
+        request_action: 'Send me a new link'
+        request_title: 'Manage your pre-orders'
+        request_message: 'Enter the e-mail address you used for your pre-orders and we will send you a link to manage them.'
+        request_error: 'Please enter a valid e-mail address and try again.'
+        request_submit: 'Send link'
+        sent_title: 'Check your inbox'
+        sent_message: 'If there are pre-orders for that address, we have sent a link to manage them. It works for 24 hours.'
+    manage_mail:
+        title: 'Manage your pre-orders'
+        message: 'Use the button below to see and delete your pre-orders. The link works for {hours} hours.'
+        ignore: 'If you did not ask for this e-mail, you can ignore it.'
     admin:
         preorderability:
             label: 'Pre-orders'

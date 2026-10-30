@@ -19,6 +19,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Session\Session;
 use Symfony\Component\HttpFoundation\Session\Storage\MockArraySessionStorage;
+use Symfony\Component\HttpFoundation\UriSigner;
 use Symfony\Component\Routing\Exception\RouteNotFoundException;
 use Symfony\Component\Routing\RequestContext;
 use Symfony\Component\Routing\RouterInterface;
@@ -27,6 +28,7 @@ use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\Subscription;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Factory\SubscriptionFactory;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Mailer\SafeSender;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Manage\ManageLinkGenerator;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Preorderability\PreorderabilityResolverInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Processor\ProcessResult;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Processor\SubscriptionProcessor;
@@ -100,6 +102,7 @@ final class SubscriptionProcessorTest extends TestCase
             new AccountCustomerFinder($this->customerRepository),
             $this->guestSession,
             $router,
+            new ManageLinkGenerator($router, new UriSigner('secret')),
             $canonicalizer,
             new NullLogger(),
         );
@@ -191,7 +194,8 @@ final class SubscriptionProcessorTest extends TestCase
                     $data['product'] === $this->product &&
                     $data['channel'] === $this->channel &&
                     'hu_HU' === $data['localeCode'] &&
-                    null === $data['manageUrl'] &&
+                    is_string($data['manageUrl']) &&
+                    str_starts_with($data['manageUrl'], 'https://shop.example/webgriffe_back_in_stock_notification_manage?_hash=') &&
                     null === $data['accountUrl'] &&
                     'queue' === $data['mode'] &&
                     24 === $data['holdHours'];
@@ -238,6 +242,7 @@ final class SubscriptionProcessorTest extends TestCase
             new AccountCustomerFinder($this->customerRepository),
             $this->guestSession,
             $router,
+            new ManageLinkGenerator($router, new UriSigner('secret')),
             $canonicalizer,
             new NullLogger(),
         );
@@ -345,6 +350,7 @@ final class SubscriptionProcessorTest extends TestCase
             new AccountCustomerFinder($this->customerRepository),
             $this->guestSession,
             $router,
+            new ManageLinkGenerator($router, new UriSigner('secret')),
             $canonicalizer,
             new NullLogger(),
         );

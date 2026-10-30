@@ -53,6 +53,78 @@ final class SubscriptionRepository extends EntityRepository implements Subscript
         return $result;
     }
 
+    public function findManageableByEmail(string $emailCanonical, ChannelInterface $channel): array
+    {
+        /** @var list<SubscriptionInterface> $result */
+        $result = $this->createEmailQueryBuilder($emailCanonical, $channel)
+            ->andWhere('subscription.status != :cancelled')
+            ->andWhere('subscription.dismissedAt IS NULL')
+            ->setParameter('cancelled', SubscriptionStatus::CANCELLED)
+            ->getQuery()
+            ->getResult()
+        ;
+
+        return $result;
+    }
+
+    public function findActiveByEmail(string $emailCanonical, ChannelInterface $channel): array
+    {
+        /** @var list<SubscriptionInterface> $result */
+        $result = $this->createEmailQueryBuilder($emailCanonical, $channel)
+            ->andWhere('subscription.status IN (:statuses)')
+            ->setParameter('statuses', SubscriptionStatus::ACTIVE)
+            ->getQuery()
+            ->getResult()
+        ;
+
+        return $result;
+    }
+
+    public function findOneByHashAndEmail(string $hash, string $emailCanonical): ?SubscriptionInterface
+    {
+        /** @var SubscriptionInterface|null $result */
+        $result = $this->findOneBy(['hash' => $hash, 'emailCanonical' => $emailCanonical]);
+
+        return $result;
+    }
+
+    public function findCancelledByIds(array $ids, string $emailCanonical): array
+    {
+        if ([] === $ids) {
+            return [];
+        }
+
+        /** @var list<SubscriptionInterface> $result */
+        $result = $this
+            ->createQueryBuilder('subscription')
+            ->andWhere('subscription.id IN (:ids)')
+            ->andWhere('subscription.emailCanonical = :emailCanonical')
+            ->andWhere('subscription.status = :cancelled')
+            ->setParameter('ids', $ids)
+            ->setParameter('emailCanonical', $emailCanonical)
+            ->setParameter('cancelled', SubscriptionStatus::CANCELLED)
+            ->addOrderBy('subscription.createdAt', 'ASC')
+            ->addOrderBy('subscription.id', 'ASC')
+            ->getQuery()
+            ->getResult()
+        ;
+
+        return $result;
+    }
+
+    private function createEmailQueryBuilder(string $emailCanonical, ChannelInterface $channel): QueryBuilder
+    {
+        return $this
+            ->createQueryBuilder('subscription')
+            ->andWhere('subscription.emailCanonical = :emailCanonical')
+            ->andWhere('subscription.channel = :channel')
+            ->setParameter('emailCanonical', $emailCanonical)
+            ->setParameter('channel', $channel)
+            ->addOrderBy('subscription.createdAt', 'ASC')
+            ->addOrderBy('subscription.id', 'ASC')
+        ;
+    }
+
     private function createActiveTargetQueryBuilder(ProductInterface $product, ?ProductVariantInterface $variant, ChannelInterface $channel): QueryBuilder
     {
         $queryBuilder = $this

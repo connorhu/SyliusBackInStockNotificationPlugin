@@ -61,13 +61,15 @@ final class ProductInventoryContext implements Context
     }
 
     /**
+     * A guest sees the same success state for an already pre-ordered address, so the page never reveals who has pre-ordered.
+     *
      * @Then I should be notified that the email :email is already subscribed
      */
     public function iShouldBeNotifiedThatTheEmailIsAlreadySubscribed(string $email): void
     {
         $this->notificationChecker->checkNotification(
-            $this->translator->trans('webgriffe_bisn.form_submission.already_saved', ['email' => $email]),
-            NotificationType::failure(),
+            $this->translator->trans('webgriffe_bisn.form_submission.subscription_successfully'),
+            NotificationType::success(),
         );
     }
 }

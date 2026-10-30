@@ -4,3 +4,5 @@ sylius_mailer:
             template: "@WebgriffeSyliusBackInStockNotificationPlugin/email/success_subscription.html.twig"
         webgriffe_back_in_stock_notification_alert:
             template: "@WebgriffeSyliusBackInStockNotificationPlugin/email/notification_alert.html.twig"
+        webgriffe_back_in_stock_notification_manage_link:
+            template: "@WebgriffeSyliusBackInStockNotificationPlugin/email/manage_link.html.twig"

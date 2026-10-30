@@ -1,0 +1,7 @@
+{% extends '@WebgriffeSyliusBackInStockNotificationPlugin/shop/manage/_layout.html.twig' %}
+
+{% block manage_content %}
+    <h1 class="h3 mb-3">{{ 'webgriffe_bisn.manage.expired_title'|trans }}</h1>
+    <p>{{ 'webgriffe_bisn.manage.expired_message'|trans }}</p>
+    <a class="btn btn-primary" href="{{ path('webgriffe_back_in_stock_notification_manage_request') }}">{{ 'webgriffe_bisn.manage.request_action'|trans }}</a>
+{% endblock %}

@@ -56,3 +56,17 @@ The `down()` removes subscriptions without a variant, since the old schema canno
   reveal who has pre-ordered. Duplicates are detected in the processor (`ProcessResult::AlreadySubscribed`); a guest sees the same success
   state as for a new pre-order (nothing stored, no second mail), a logged-in customer sees the `webgriffe_bisn.subscription.already_saved` error.
 - `GuestPreorderSession` remembers the ids of the pre-orders a guest created (session key `webgriffe_bisn_guest_preorders`).
+
+## Manage page replaces the GET delete (BC break)
+
+- The route `webgriffe_back_in_stock_notification_delete_subscription` (GET delete by hash), `SubscriptionController` and the account grid's
+  `delete` field with its template are removed: a state-changing GET link in a mail can be triggered by anyone holding it. Guests manage their
+  pre-orders on `webgriffe_back_in_stock_notification_manage`, opened from a signed link (e-mail + `expires`, valid 24 hours, no token table);
+  deleting is a CSRF-protected POST that cancels softly (`markCancelled`) and can be undone for 10 minutes (`CancelUndoSession`).
+- New routes: `..._manage`, `..._manage_request`, `..._manage_link_sent`, `..._manage_delete`, `..._manage_delete_all`, `..._manage_restore`;
+  new mail code `webgriffe_back_in_stock_notification_manage_link`.
+- `symfony/rate-limiter` is now required. The bundle prepends the limiters `webgriffe_bisn_manage_link_email` (1 per 60 s) and
+  `webgriffe_bisn_manage_link_ip` (10 per hour) to `framework.rate_limiter`.
+- `SubscriptionProcessor` takes the `ManageLinkGenerator` as a new constructor argument (after the router); the confirmation mail's
+  `manageUrl` is now filled for guest pre-orders.
+- `SubscriptionRepositoryInterface` gains `findManageableByEmail()`, `findActiveByEmail()`, `findOneByHashAndEmail()` and `findCancelledByIds()`.

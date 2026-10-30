@@ -19,6 +19,7 @@ use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\PreorderChannelSettings
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Factory\SubscriptionFactoryInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Mailer\SafeSender;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Manage\ManageLinkGenerator;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Preorderability\PreorderabilityResolverInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Repository\SubscriptionRepositoryInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Session\GuestPreorderSession;
@@ -38,6 +39,7 @@ final class SubscriptionProcessor implements SubscriptionProcessorInterface
         private AccountCustomerFinder $accountCustomerFinder,
         private GuestPreorderSession $guestPreorderSession,
         private RouterInterface $router,
+        private ManageLinkGenerator $manageLinkGenerator,
         private CanonicalizerInterface $canonicalizer,
         private LoggerInterface $logger,
     ) {
@@ -127,7 +129,14 @@ final class SubscriptionProcessor implements SubscriptionProcessorInterface
 
         try {
             $accountUrl = null;
-            if (null !== $subscription->getCustomer()) {
+            $manageUrl = null;
+            if (null === $subscription->getCustomer()) {
+                $manageUrl = $this->manageLinkGenerator->generate(
+                    (string) $subscription->getEmailCanonical(),
+                    new \DateTimeImmutable(),
+                    $localeCode,
+                );
+            } else {
                 $accountUrl = $this->router->generate(
                     'webgriffe_back_in_stock_notification_account_list_subscriptions',
                     ['_locale' => $localeCode],
@@ -141,7 +150,7 @@ final class SubscriptionProcessor implements SubscriptionProcessorInterface
                 [
                     'subscription' => $subscription,
                     'product' => $product,
-                    'manageUrl' => null,
+                    'manageUrl' => $manageUrl,
                     'accountUrl' => $accountUrl,
                     'mode' => $mode,
                     'holdHours' => $holdHours,

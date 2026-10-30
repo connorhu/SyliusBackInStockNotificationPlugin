@@ -35,6 +35,21 @@ final class WebgriffeSyliusBackInStockNotificationExtension extends AbstractReso
     public function prepend(ContainerBuilder $container): void
     {
         $this->prependDoctrineMigrations($container);
+
+        $container->prependExtensionConfig('framework', [
+            'rate_limiter' => [
+                'webgriffe_bisn_manage_link_email' => [
+                    'policy' => 'fixed_window',
+                    'limit' => 1,
+                    'interval' => '60 seconds',
+                ],
+                'webgriffe_bisn_manage_link_ip' => [
+                    'policy' => 'sliding_window',
+                    'limit' => 10,
+                    'interval' => '1 hour',
+                ],
+            ],
+        ]);
     }
 
     protected function getMigrationsNamespace(): string
