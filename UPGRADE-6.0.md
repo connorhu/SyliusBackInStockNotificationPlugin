@@ -91,4 +91,8 @@ The `down()` removes subscriptions without a variant, since the old schema canno
   a failing flush is logged (`webgriffe_bisn.restock.flush_failed`) and stops the run (exit code 1).
 - The `alert` mail gets the variables `mode`, `holdUntil` and `variant` and the keys `webgriffe_bisn.alert_email.held_until` / `.fastest`;
   the alert and hold-expired templates read the product name and slug in the subscription's locale (`product.translation(localeCode)`),
-  so the links work from the console. `SubscriptionRepositoryInterface` gains `findRestockTargets()`.
+  so the links work from the console; the product name is no longer printed `|raw`. `SubscriptionRepositoryInterface` gains
+  `findRestockTargets()` and `countActiveHoldsByVariant()`.
+- Active holds are counted per variant across **all channels** (stock is shared), so a unit held in one channel is not free in another.
+- Rows that do not match the configured target (a variant set under the `product` target, or no variant under the `variant` target, e.g.
+  after switching the target) are skipped with the warning `webgriffe_bisn.restock.target_mismatch`; migrate or cancel them by hand.

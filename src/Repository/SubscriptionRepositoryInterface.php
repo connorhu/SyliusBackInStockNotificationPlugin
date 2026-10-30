@@ -69,4 +69,14 @@ interface SubscriptionRepositoryInterface extends RepositoryInterface
      * @return list<SubscriptionInterface>
      */
     public function findRestockTargets(): array;
+
+    /**
+     * Active holds (notified, holdUntil > now) on the given variants in every channel, keyed by variant id; stock is shared
+     * by all channels, so a unit held in one channel is not free in another. Variants without a hold are left out.
+     *
+     * @param list<ProductVariantInterface> $variants
+     *
+     * @return array<int, int>
+     */
+    public function countActiveHoldsByVariant(array $variants, \DateTimeImmutable $now): array;
 }

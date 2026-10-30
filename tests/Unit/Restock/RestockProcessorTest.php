@@ -62,6 +62,16 @@ final class RestockProcessorTest extends TestCase
 
     private RestockProcessor $processor;
 
+    private SubscriptionRepositoryInterface&MockObject $repository;
+
+    private SenderInterface&MockObject $sender;
+
+    private RouterInterface&MockObject $router;
+
+    private LoggerInterface&MockObject $logger;
+
+    private int $nextVariantId = 1;
+
     protected function setUp(): void
     {
         $this->now = new \DateTimeImmutable('2026-10-30 12:00:00');
@@ -83,6 +93,24 @@ final class RestockProcessorTest extends TestCase
             },
         );
 
+        $repository->method('countActiveHoldsByVariant')->willReturnCallback(
+            function (array $variants, \DateTimeImmutable $now): array {
+                $ids = array_map(static fn (ProductVariantInterface $variant): mixed => $variant->getId(), $variants);
+                $counts = [];
+                foreach ($this->subscriptions as $subscription) {
+                    $held = $subscription->getHeldVariant();
+                    $until = $subscription->getHoldUntil();
+                    if (SubscriptionStatus::NOTIFIED === $subscription->getStatus() && null !== $held && null !== $until && $until > $now && in_array($held->getId(), $ids, true)) {
+                        $id = (int) $held->getId();
+                        $counts[$id] = ($counts[$id] ?? 0) + 1;
+                    }
+                }
+
+                return $counts;
+            },
+        );
+        $this->repository = $repository;
+
         $this->manager = $this->createMock(ObjectManager::class);
         $this->manager->method('flush')->willReturnCallback(function (): void {
             $this->events[] = 'flush';
@@ -92,6 +120,7 @@ final class RestockProcessorTest extends TestCase
         });
 
         $sender = $this->createMock(SenderInterface::class);
+        $this->sender = $sender;
         $sender->method('send')->willReturnCallback(function (string $code, array $recipients, array $data): void {
             $this->events[] = 'mail';
             $this->mails[] = ['code' => $code, 'recipient' => (string) $recipients[0], 'data' => $data, 'host' => $this->routerContext->getHost()];
@@ -99,20 +128,30 @@ final class RestockProcessorTest extends TestCase
 
         $router = $this->createMock(RouterInterface::class);
         $router->method('getContext')->willReturn($this->routerContext);
+        $this->router = $router;
 
         $logger = $this->createMock(LoggerInterface::class);
         $logger->method('error')->willReturnCallback(function (string $message, array $context = []): void {
             $this->logs[] = ['level' => 'error', 'message' => $message, 'context' => $context];
         });
+        $logger->method('warning')->willReturnCallback(function (string $message, array $context = []): void {
+            $this->logs[] = ['level' => 'warning', 'message' => $message, 'context' => $context];
+        });
+        $this->logger = $logger;
 
-        $this->processor = new RestockProcessor(
-            $repository,
+        $this->processor = $this->processor('product');
+    }
+
+    private function processor(string $target): RestockProcessor
+    {
+        return new RestockProcessor(
+            $this->repository,
             $this->manager,
-            new TargetResolver('product', $repository),
+            new TargetResolver($target, $this->repository),
             new SellableUnits(new AvailabilityChecker()),
-            new SafeSender($sender, $logger),
-            $router,
-            $logger,
+            new SafeSender($this->sender, $this->logger),
+            $this->router,
+            $this->logger,
         );
     }
 
@@ -463,13 +502,77 @@ final class RestockProcessorTest extends TestCase
         self::assertSame(SubscriptionStatus::NOTIFIED, $bela->getStatus());
     }
 
+    public function testUnitSharedByTwoChannelsIsHeldOnce(): void
+    {
+        $web = $this->channel();
+        $other = $this->channel(code: 'OTHER');
+        $product = $this->product($web);
+        $product->addChannel($other);
+        $variant = $this->variant($product, 1);
+        $anna = $this->subscription($product, $web, 'anna@example.com', '-3 days');
+        $bela = $this->subscription($product, $other, 'bela@example.com', '-4 days');
+
+        $report = $this->processor->process($this->now);
+
+        self::assertSame($variant, $anna->getHeldVariant());
+        self::assertSame(SubscriptionStatus::WAITING, $bela->getStatus());
+        self::assertSame([1, 1, 0, 0], $this->counts($report));
+    }
+
+    public function testFastestCountsHoldsOfOtherChannels(): void
+    {
+        $web = $this->channel();
+        $other = $this->channel(PreorderChannelSettingsInterface::MODE_FASTEST, code: 'OTHER');
+        $product = $this->product($web);
+        $product->addChannel($other);
+        $variant = $this->variant($product, 1);
+        $anna = $this->subscription($product, $web, 'anna@example.com', '-3 days');
+        $anna->markNotified($this->now->modify('-1 hour'), $variant, $this->now->modify('+23 hours'));
+        $bela = $this->subscription($product, $other, 'bela@example.com', '-4 days');
+
+        $this->processor->process($this->now);
+
+        self::assertSame(SubscriptionStatus::WAITING, $bela->getStatus());
+    }
+
+    public function testVariantTargetQueuesPerVariant(): void
+    {
+        $channel = $this->channel();
+        $product = $this->product($channel);
+        $soldOut = $this->variant($product, 0);
+        $inStock = $this->variant($product, 1);
+        $anna = $this->subscription($product, $channel, 'anna@example.com', '-3 days');
+        $anna->setProductVariant($soldOut);
+        $bela = $this->subscription($product, $channel, 'bela@example.com', '-2 days');
+        $bela->setProductVariant($inStock);
+
+        $this->processor('variant')->process($this->now);
+
+        self::assertSame(SubscriptionStatus::WAITING, $anna->getStatus());
+        self::assertSame($inStock, $bela->getHeldVariant());
+    }
+
+    public function testRowNotMatchingTheConfiguredTargetIsSkippedWithAWarning(): void
+    {
+        $channel = $this->channel();
+        $product = $this->product($channel);
+        $variant = $this->variant($product, 1);
+        $anna = $this->subscription($product, $channel, 'anna@example.com', '-3 days');
+        $anna->setProductVariant($variant);
+
+        $this->processor->process($this->now);
+
+        self::assertSame(SubscriptionStatus::WAITING, $anna->getStatus());
+        self::assertSame(['webgriffe_bisn.restock.target_mismatch'], array_column($this->logs, 'message'));
+    }
+
     /** @return list<SubscriptionInterface> */
     private function representatives(): array
     {
         $seen = [];
         $result = [];
         foreach ($this->subscriptions as $subscription) {
-            $key = spl_object_id($subscription->getProduct() ?? $subscription) . '-' . spl_object_id($subscription->getChannel() ?? $subscription);
+            $key = spl_object_id($subscription->getProduct() ?? $subscription) . '-' . spl_object_id($subscription->getChannel() ?? $subscription) . '-' . (null === $subscription->getProductVariant() ? '' : spl_object_id($subscription->getProductVariant()));
             if ($subscription->isActive() && !isset($seen[$key])) {
                 $seen[$key] = true;
                 $result[] = $subscription;
@@ -507,6 +610,7 @@ final class RestockProcessorTest extends TestCase
     private function variant(Product $product, int $onHand, ?int $price = 1000): ProductVariant
     {
         $variant = new ProductVariant();
+        (new \ReflectionProperty(ProductVariant::class, 'id'))->setValue($variant, $this->nextVariantId++);
         $variant->setCode('COPY-' . spl_object_id($variant));
         $variant->setTracked(true);
         $variant->setOnHand($onHand);

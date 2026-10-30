@@ -13,7 +13,7 @@
     <div style="text-align: center; padding-bottom: 15px; font-size: 15px;">
         {{ 'webgriffe_bisn.alert_email.alert_message'|trans({
             '{product}': translation.name
-        }, null, localeCode)|raw }}
+        }, null, localeCode) }}
     </div>
 
     <div style="text-align: center; padding-bottom: 15px; font-size: 15px;">
@@ -26,7 +26,7 @@
 
     <div style="text-align: center; padding-bottom: 30px; font-size: 15px;">
         <a href="{{ url('sylius_shop_product_show', {'slug': translation.slug, '_locale': localeCode}) }}" style="display: inline-block; text-align: center; background: #1abb9c; padding: 18px 28px; color: #fff; text-decoration: none; text-transform: uppercase; border-radius: 3px;" target="_blank">
-            {{ 'webgriffe_bisn.alert_email.alert_action'|trans({}, null, localeCode)|raw }}
+            {{ 'webgriffe_bisn.alert_email.alert_action'|trans({}, null, localeCode) }}
         </a>
     </div>
 {% endblock %}

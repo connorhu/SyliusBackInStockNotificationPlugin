@@ -59,6 +59,19 @@ final class RestockProcessor
             if (!$channel instanceof ChannelInterface || null === $product) {
                 continue;
             }
+            $hasVariant = null !== $representative->getProductVariant();
+            if ($hasVariant !== (TargetResolverInterface::TARGET_VARIANT === $this->targetResolver->target())) {
+                // A row from before a target switch (or an upstream row without a variant under the variant target):
+                // processing it would open a second queue over the same units, so it is left alone.
+                $this->logger->warning('webgriffe_bisn.restock.target_mismatch', [
+                    'product' => $product->getCode(),
+                    'variant' => $representative->getProductVariant()?->getCode(),
+                    'channel' => $channel->getCode(),
+                    'target' => $this->targetResolver->target(),
+                ]);
+
+                continue;
+            }
 
             try {
                 $plan = $this->plan($representative, $product, $channel, $now);
@@ -130,11 +143,9 @@ final class RestockProcessor
 
         // 1. Expire: a hold that ran out releases its unit; the holder stays notified and may still buy.
         $expire = [];
-        $activeHolds = [];
         $holders = [];
         foreach ($subscriptions as $subscription) {
-            $heldVariant = $subscription->getHeldVariant();
-            if (SubscriptionStatus::NOTIFIED !== $subscription->getStatus() || null === $heldVariant) {
+            if (SubscriptionStatus::NOTIFIED !== $subscription->getStatus() || null === $subscription->getHeldVariant()) {
                 continue;
             }
             $holdUntil = $subscription->getHoldUntil();
@@ -143,9 +154,14 @@ final class RestockProcessor
 
                 continue;
             }
-            $key = self::key($heldVariant);
-            $activeHolds[$key] = ($activeHolds[$key] ?? 0) + 1;
             $holders[spl_object_id($subscription)] = true;
+        }
+
+        // Active holds on the target's variants in every channel: stock is shared, so a unit held anywhere is not free.
+        // Nothing is pending in memory (each target is flushed before the next one), so the database count is current.
+        $activeHolds = [];
+        foreach ($this->subscriptionRepository->countActiveHoldsByVariant($variants, $now) as $variantId => $holds) {
+            $activeHolds['id-' . $variantId] = $holds;
         }
 
         // 2. Re-wait: a notified pre-order without an active hold whose target sold out goes back to waiting,
