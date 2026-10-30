@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Webgriffe\SyliusBackInStockNotificationPlugin\Unit\Manage;
 
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Sylius\Component\Core\Model\ChannelInterface;
 use Sylius\Component\Mailer\Sender\SenderInterface;
@@ -49,7 +50,27 @@ final class ManageLinkMailerTest extends TestCase
         $mailer->onTerminate();
     }
 
-    private function mailer(SubscriptionRepositoryInterface $repository, SenderInterface $sender): ManageLinkMailer
+    public function testFailureIsLoggedAndTheNextRequestStillGoesOut(): void
+    {
+        $channel = $this->createMock(ChannelInterface::class);
+        $repository = $this->createMock(SubscriptionRepositoryInterface::class);
+        $repository->method('findActiveByEmail')->willReturnCallback(
+            static fn (string $email): array => 'broken@b.hu' === $email
+                ? throw new \RuntimeException('db down')
+                : [new \stdClass()],
+        );
+        $sender = $this->createMock(SenderInterface::class);
+        $sender->expects(self::once())->method('send');
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('error')->with('webgriffe_bisn.manage_link_failed', self::anything());
+
+        $mailer = $this->mailer($repository, $sender, $logger);
+        $mailer->defer('broken@b.hu', 'broken@b.hu', $channel, 'hu_HU');
+        $mailer->defer('a@b.hu', 'a@b.hu', $channel, 'hu_HU');
+        $mailer->onTerminate();
+    }
+
+    private function mailer(SubscriptionRepositoryInterface $repository, SenderInterface $sender, ?LoggerInterface $logger = null): ManageLinkMailer
     {
         $router = $this->createMock(UrlGeneratorInterface::class);
         $router->method('generate')->willReturn('https://shop.test/hu/manage');
@@ -58,6 +79,7 @@ final class ManageLinkMailerTest extends TestCase
             $repository,
             new ManageLinkGenerator($router, new UriSigner('secret')),
             new SafeSender($sender, new NullLogger()),
+            $logger ?? new NullLogger(),
         );
     }
 }

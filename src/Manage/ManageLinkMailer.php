@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Webgriffe\SyliusBackInStockNotificationPlugin\Manage;
 
+use Psr\Log\LoggerInterface;
 use Sylius\Component\Channel\Model\ChannelInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Mailer\SafeSender;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Repository\SubscriptionRepositoryInterface;
@@ -21,6 +22,7 @@ final class ManageLinkMailer
         private SubscriptionRepositoryInterface $subscriptionRepository,
         private ManageLinkGenerator $linkGenerator,
         private SafeSender $sender,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -35,20 +37,25 @@ final class ManageLinkMailer
         $this->pending = [];
 
         foreach ($pending as $request) {
-            if ([] === $this->subscriptionRepository->findActiveByEmail($request['emailCanonical'], $request['channel'])) {
-                continue;
-            }
+            // Runs after the response: one failing request must neither escape kernel.terminate nor stop the others.
+            try {
+                if ([] === $this->subscriptionRepository->findActiveByEmail($request['emailCanonical'], $request['channel'])) {
+                    continue;
+                }
 
-            $this->sender->send(
-                'webgriffe_back_in_stock_notification_manage_link',
-                $request['email'],
-                [
-                    'manageUrl' => $this->linkGenerator->generate($request['emailCanonical'], new \DateTimeImmutable(), $request['localeCode']),
-                    'ttlHours' => 24,
-                ],
-                $request['channel'],
-                $request['localeCode'],
-            );
+                $this->sender->send(
+                    'webgriffe_back_in_stock_notification_manage_link',
+                    $request['email'],
+                    [
+                        'manageUrl' => $this->linkGenerator->generate($request['emailCanonical'], new \DateTimeImmutable(), $request['localeCode']),
+                        'ttlHours' => 24,
+                    ],
+                    $request['channel'],
+                    $request['localeCode'],
+                );
+            } catch (\Throwable $exception) {
+                $this->logger->error('webgriffe_bisn.manage_link_failed', ['exception' => $exception]);
+            }
         }
     }
 }

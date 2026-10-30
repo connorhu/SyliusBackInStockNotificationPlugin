@@ -35,6 +35,7 @@ services:
             - '@webgriffe.repository.back_in_stock_notification_subscription'
             - '@Webgriffe\SyliusBackInStockNotificationPlugin\Manage\ManageLinkGenerator'
             - '@Webgriffe\SyliusBackInStockNotificationPlugin\Mailer\SafeSender'
+            - '@monolog.logger'
         tags:
             - { name: kernel.event_listener, event: kernel.terminate, method: onTerminate }
 
