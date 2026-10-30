@@ -17,6 +17,7 @@ use Symfony\Component\Security\Csrf\CsrfToken;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 use Twig\Environment;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Account\AccountRow;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Customer\SubscriptionOwnership;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\PreorderChannelSettingsInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionStatus;
@@ -93,7 +94,7 @@ final class AccountController
             $this->channelContext->getChannel(),
         );
         foreach ($subscriptions as $subscription) {
-            if ($this->owns($customer, $subscription)) {
+            if (SubscriptionOwnership::isOwnedBy($subscription, $customer)) {
                 $subscription->restore();
                 $this->subscriptionRepository->add($subscription);
             }
@@ -120,23 +121,11 @@ final class AccountController
         $this->assertCsrf($request);
 
         $subscription = $this->subscriptionRepository->find($id);
-        if (!$subscription instanceof SubscriptionInterface || !$this->owns($customer, $subscription)) {
+        if (!$subscription instanceof SubscriptionInterface || !SubscriptionOwnership::isOwnedBy($subscription, $customer)) {
             throw new NotFoundHttpException();
         }
 
         return $subscription;
-    }
-
-    private function owns(CustomerInterface $customer, SubscriptionInterface $subscription): bool
-    {
-        $owner = $subscription->getCustomer();
-        if (null !== $owner) {
-            return $owner === $customer || (null !== $owner->getId() && $owner->getId() === $customer->getId());
-        }
-
-        $emailCanonical = $this->emailCanonical($customer);
-
-        return '' !== $emailCanonical && $subscription->getEmailCanonical() === $emailCanonical;
     }
 
     private function customer(): CustomerInterface

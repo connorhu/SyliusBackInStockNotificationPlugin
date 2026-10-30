@@ -336,6 +336,11 @@ final class SubscriptionRepository extends EntityRepository implements Subscript
     {
         $queryBuilder = $this
             ->createQueryBuilder('subscription')
+            // What a row renders (product name and slug, variant name), so the list costs a constant number of queries.
+            ->addSelect('product', 'translation', 'variant')
+            ->innerJoin('subscription.product', 'product')
+            ->leftJoin('product.translations', 'translation')
+            ->leftJoin('subscription.productVariant', 'variant')
             ->andWhere('subscription.channel = :channel')
             ->andWhere('subscription.status != :cancelled')
             ->andWhere('subscription.dismissedAt IS NULL')

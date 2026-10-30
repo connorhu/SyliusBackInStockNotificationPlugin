@@ -15,7 +15,6 @@ use Sylius\Component\Core\Model\ProductVariantInterface;
 use Sylius\Component\Core\Repository\ProductRepositoryInterface;
 use Sylius\Component\Core\Repository\ProductVariantRepositoryInterface;
 use Sylius\Component\Customer\Context\CustomerContextInterface;
-use Sylius\Component\Customer\Model\CustomerInterface;
 use Sylius\Component\Product\Resolver\ProductVariantResolverInterface;
 use Sylius\TwigHooks\LiveComponent\HookableLiveComponentTrait;
 use Symfony\Component\Form\FormError;
@@ -30,7 +29,7 @@ use Symfony\UX\LiveComponent\Attribute\LiveProp;
 use Symfony\UX\LiveComponent\ComponentWithFormTrait;
 use Symfony\UX\LiveComponent\DefaultActionTrait;
 use Symfony\UX\TwigComponent\Attribute\PostMount;
-use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionInterface;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Customer\SubscriptionOwnership;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Form\SubscriptionType;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Preorderability\PreorderabilityResolverInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Processor\ProcessResult;
@@ -140,7 +139,7 @@ final class AddNotificationComponent
         $subscription = $this->getView()->subscription;
         $customer = $this->customerContext->getCustomer();
 
-        return null !== $subscription && null !== $customer && $subscription->isActive() && $this->isOwnedBy($subscription, $customer);
+        return null !== $subscription && null !== $customer && $subscription->isActive() && SubscriptionOwnership::isOwnedBy($subscription, $customer);
     }
 
     protected function instantiateForm(): FormInterface
@@ -244,7 +243,7 @@ final class AddNotificationComponent
         $this->view = null;
         $subscription = $this->getView()->subscription;
         $customer = $this->customerContext->getCustomer();
-        if (null !== $subscription && null !== $customer && $subscription->isActive() && $this->isOwnedBy($subscription, $customer)) {
+        if (null !== $subscription && null !== $customer && $subscription->isActive() && SubscriptionOwnership::isOwnedBy($subscription, $customer)) {
             $now = new \DateTimeImmutable();
             $subscription->markCancelled($now);
             $this->subscriptionRepository->add($subscription);
@@ -270,7 +269,7 @@ final class AddNotificationComponent
                 $channel,
             );
             foreach ($subscriptions as $subscription) {
-                if ($this->isOwnedBy($subscription, $customer)) {
+                if (SubscriptionOwnership::isOwnedBy($subscription, $customer)) {
                     $subscription->restore();
                     $this->subscriptionRepository->add($subscription);
                 }
@@ -278,17 +277,5 @@ final class AddNotificationComponent
         }
         $this->cancelled = false;
         $this->view = null;
-    }
-
-    private function isOwnedBy(SubscriptionInterface $subscription, CustomerInterface $customer): bool
-    {
-        $owner = $subscription->getCustomer();
-        if (null !== $owner) {
-            return $owner === $customer || (null !== $owner->getId() && $owner->getId() === $customer->getId());
-        }
-
-        $emailCanonical = (string) $customer->getEmailCanonical();
-
-        return '' !== $emailCanonical && $subscription->getEmailCanonical() === $emailCanonical;
     }
 }
