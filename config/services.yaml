@@ -13,6 +13,7 @@ services:
             - '@Webgriffe\SyliusBackInStockNotificationPlugin\Mailer\SafeSender'
             - '@router'
             - '@monolog.logger'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Claim\ClaimLinkGenerator'
 
     # Sylius' plain availability on purpose: a hold-aware decorator of sylius.checker.inventory.availability must not apply here.
     Webgriffe\SyliusBackInStockNotificationPlugin\Restock\SellableUnits:
@@ -144,3 +145,61 @@ services:
 
     Webgriffe\SyliusBackInStockNotificationPlugin\Form\Extension\ChannelPreorderTypeExtension:
         tags: [ 'form.type_extension' ]
+
+    Webgriffe\SyliusBackInStockNotificationPlugin\Claim\ClaimLinkGenerator:
+        arguments:
+            - '@router'
+            - '@uri_signer'
+
+    Webgriffe\SyliusBackInStockNotificationPlugin\Controller\ClaimController:
+        tags: [ 'controller.service_arguments' ]
+        arguments:
+            - '@router'
+            - '@webgriffe.repository.back_in_stock_notification_subscription'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Claim\ClaimLinkGenerator'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Hold\ClaimSession'
+
+    Webgriffe\SyliusBackInStockNotificationPlugin\Hold\ClaimSession:
+        arguments:
+            - '@request_stack'
+
+    Webgriffe\SyliusBackInStockNotificationPlugin\Hold\HoldVisitor:
+        arguments:
+            - '@sylius.context.customer'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Hold\ClaimSession'
+            - '@webgriffe.repository.back_in_stock_notification_subscription'
+            - '@webgriffe.resolver.target'
+        tags:
+            - { name: kernel.reset, method: reset }
+
+    # Shop requests only (Sylius' section provider); admin, API and CLI get the decorated checker's answer.
+    Webgriffe\SyliusBackInStockNotificationPlugin\Hold\HoldAwareAvailabilityChecker:
+        decorates: sylius.checker.inventory.availability
+        arguments:
+            - '@.inner'
+            - '@sylius.section_resolver.uri_based'
+            - '@webgriffe.repository.back_in_stock_notification_subscription'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Hold\HoldVisitor'
+        tags:
+            - { name: kernel.reset, method: reset }
+
+    Webgriffe\SyliusBackInStockNotificationPlugin\EventListener\OrderCompletedListener:
+        arguments:
+            - '@webgriffe.repository.back_in_stock_notification_subscription'
+            - '@webgriffe.manager.back_in_stock_notification_subscription'
+            - '@webgriffe.resolver.target'
+            - '@sylius.canonicalizer'
+            - '@monolog.logger'
+        tags:
+            - { name: kernel.event_listener, event: sylius.order.post_complete, method: onOrderPostComplete }
+
+    Webgriffe\SyliusBackInStockNotificationPlugin\State\PreorderStateResolver:
+        arguments:
+            - '@webgriffe.repository.back_in_stock_notification_subscription'
+            - '@webgriffe.resolver.target'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Restock\SellableUnits'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Hold\HoldVisitor'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Session\GuestPreorderSession'
+            - '@webgriffe.resolver.preorderability'
+
+    webgriffe.resolver.preorder_state: '@Webgriffe\SyliusBackInStockNotificationPlugin\State\PreorderStateResolver'

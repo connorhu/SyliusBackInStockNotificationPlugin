@@ -17,8 +17,10 @@ use Sylius\Component\Core\Model\ProductVariant;
 use Sylius\Component\Core\Model\ProductVariantInterface;
 use Sylius\Component\Inventory\Checker\AvailabilityChecker;
 use Sylius\Component\Mailer\Sender\SenderInterface;
+use Symfony\Component\HttpFoundation\UriSigner;
 use Symfony\Component\Routing\RequestContext;
 use Symfony\Component\Routing\RouterInterface;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Claim\ClaimLinkGenerator;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\PreorderChannelSettingsInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\PreorderChannelSettingsTrait;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\Subscription;
@@ -128,6 +130,9 @@ final class RestockProcessorTest extends TestCase
 
         $router = $this->createMock(RouterInterface::class);
         $router->method('getContext')->willReturn($this->routerContext);
+        $router->method('generate')->willReturnCallback(
+            static fn (string $name, array $parameters): string => 'https://shop.test/' . $name . '?' . http_build_query($parameters),
+        );
         $this->router = $router;
 
         $logger = $this->createMock(LoggerInterface::class);
@@ -152,6 +157,7 @@ final class RestockProcessorTest extends TestCase
             new SafeSender($this->sender, $this->logger),
             $this->router,
             $this->logger,
+            new ClaimLinkGenerator($this->router, new UriSigner('secret')),
         );
     }
 
@@ -174,6 +180,9 @@ final class RestockProcessorTest extends TestCase
         self::assertSame(['anna@example.com', 'bela@example.com'], $this->recipients(self::ALERT));
         self::assertSame('fastest', $this->mails[0]['data']['mode']);
         self::assertNull($this->mails[0]['data']['holdUntil']);
+        $claimUrl = $this->mails[0]['data']['claimUrl'];
+        self::assertIsString($claimUrl);
+        self::assertStringStartsWith('https://shop.test/sylius_shop_product_show?', $claimUrl);
         self::assertSame([2, 0, 0, 0], $this->counts($report));
     }
 
@@ -194,6 +203,11 @@ final class RestockProcessorTest extends TestCase
         self::assertSame(['anna@example.com'], $this->recipients(self::ALERT));
         self::assertSame('queue', $this->mails[0]['data']['mode']);
         self::assertEquals($this->now->modify('+48 hours'), $this->mails[0]['data']['holdUntil']);
+        $claimUrl = $this->mails[0]['data']['claimUrl'];
+        self::assertIsString($claimUrl);
+        self::assertStringStartsWith('https://shop.test/webgriffe_back_in_stock_notification_claim?', $claimUrl);
+        self::assertStringContainsString('expires=' . $this->now->modify('+48 hours')->getTimestamp(), $claimUrl);
+        self::assertStringContainsString('_hash=', $claimUrl);
         self::assertSame([1, 1, 0, 0], $this->counts($report));
     }
 
@@ -601,6 +615,9 @@ final class RestockProcessorTest extends TestCase
     private function product(Channel $channel): Product
     {
         $product = new Product();
+        $product->setCurrentLocale('en_US');
+        $product->setFallbackLocale('en_US');
+        $product->setSlug('book-' . spl_object_id($product));
         $product->setCode('BOOK-' . spl_object_id($product));
         $product->addChannel($channel);
 
@@ -632,6 +649,7 @@ final class RestockProcessorTest extends TestCase
         $subscription->setChannel($channel);
         $subscription->setEmail($email);
         $subscription->setLocaleCode('en_US');
+        $subscription->setHash('hash-' . $email);
         $subscription->setCreatedAt($this->now->modify($createdAgo));
         $this->subscriptions[] = $subscription;
 
