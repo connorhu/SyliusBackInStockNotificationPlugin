@@ -1,4 +1,8 @@
 webgriffe_bisn:
+    form_submission:
+        rate_limited:
+            title: 'Pár perc múlva jegyezhetsz elő újra.'
+            body: '{1} Percenként egy előjegyzést fogadunk el. Az adataid megmaradtak, próbáld újra kicsit később.|{2} Két percenként egy előjegyzést fogadunk el. Az adataid megmaradtak, próbáld újra kicsit később.|]2,Inf[ %count% percenként egy előjegyzést fogadunk el. Az adataid megmaradtak, próbáld újra kicsit később.'
     product_page:
         name: 'Neved'
     subscription_mail:

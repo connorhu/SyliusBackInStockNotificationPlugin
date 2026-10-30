@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Webgriffe\SyliusBackInStockNotificationPlugin\Twig\Component;
 
+use Psr\Log\LoggerInterface;
 use Sylius\Bundle\ShopBundle\Twig\Component\Product\AddToCartFormComponent;
 use Sylius\Bundle\ShopBundle\Twig\Component\Product\Trait\ProductLivePropTrait;
 use Sylius\Bundle\ShopBundle\Twig\Component\Product\Trait\ProductVariantLivePropTrait;
@@ -30,7 +31,9 @@ use Symfony\UX\LiveComponent\DefaultActionTrait;
 use Symfony\UX\TwigComponent\Attribute\PostMount;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Form\SubscriptionType;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Preorderability\PreorderabilityResolverInterface;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Processor\ProcessResult;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Processor\SubscriptionProcessorInterface;
+use Webgriffe\SyliusBackInStockNotificationPlugin\RateLimit\PreorderRateLimiter;
 use Webmozart\Assert\Assert;
 
 #[AsLiveComponent]
@@ -46,6 +49,10 @@ final class AddNotificationComponent
     #[LiveProp]
     public bool $notificationSent = false;
 
+    /** Minutes the visitor has to wait after a rate-limited attempt; null when the last attempt was not limited. */
+    #[LiveProp]
+    public ?int $rateLimitedMinutes = null;
+
     #[LiveProp]
     public bool $isCustomerLoggedIn = false;
 
@@ -59,6 +66,7 @@ final class AddNotificationComponent
         protected readonly PreorderabilityResolverInterface $preorderabilityResolver,
         protected readonly ChannelContextInterface $channelContext,
         protected readonly RequestStack $requestStack,
+        protected readonly LoggerInterface $logger,
     ) {
         $this->initializeProduct($productRepository);
         $this->initializeProductVariant($productVariantRepository);
@@ -117,10 +125,22 @@ final class AddNotificationComponent
     public function addNotification(): void
     {
         $this->notificationSent = false;
+        $this->rateLimitedMinutes = null;
         $this->formValues['product_variant_code'] = $this->variant?->getCode();
         $this->submitForm();
 
         Assert::notNull($this->product);
+
+        // Honeypot: a bot that fills the hidden field gets the guest success state; nothing is stored or mailed.
+        /** @psalm-suppress MixedAssignment */
+        $honeypot = $this->getForm()->get('website')->getData();
+        if (is_string($honeypot) && '' !== trim($honeypot)) {
+            $this->logger->info('webgriffe_bisn.honeypot_filled');
+            $this->notificationSent = true;
+            $this->resetForm();
+
+            return;
+        }
 
         $formData = $this->getForm()->getData();
         Assert::isArray($formData);
@@ -135,6 +155,15 @@ final class AddNotificationComponent
             $customer,
             $this->requestStack->getCurrentRequest()?->getClientIp(),
         );
+
+        if (ProcessResult::RateLimited === $result) {
+            // The form keeps its data so the visitor can simply try again a little later.
+            $channel = $this->channelContext->getChannel();
+            Assert::isInstanceOf($channel, ChannelInterface::class);
+            $this->rateLimitedMinutes = max(1, (int) ceil(PreorderRateLimiter::intervalSeconds($channel) / 60));
+
+            return;
+        }
 
         $errorKey = $result->errorKey(null === $customer);
         if (null !== $errorKey) {
