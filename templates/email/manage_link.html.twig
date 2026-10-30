@@ -1,0 +1,25 @@
+{% extends '@SyliusShop/email/layout.html.twig' %}
+
+{% block subject %}{{ 'webgriffe_bisn.manage_mail.title'|trans({}, null, localeCode) }}{% endblock %}
+
+{% block content %}
+    <div style="text-align: center; padding-bottom: 30px;">
+        <div style="font-size: 30px; line-height: 1.2;">
+            {{ 'webgriffe_bisn.manage_mail.title'|trans({}, null, localeCode) }}
+        </div>
+    </div>
+
+    <div style="text-align: center; padding-bottom: 15px; font-size: 15px;">
+        {{ 'webgriffe_bisn.manage_mail.message'|trans({'{hours}': ttlHours}, null, localeCode) }}
+    </div>
+
+    <div style="text-align: center; padding-bottom: 20px; font-size: 15px;">
+        <a href="{{ manageUrl }}" style="display: inline-block; text-align: center; background: #1abb9c; padding: 18px 28px; color: #fff; text-decoration: none; text-transform: uppercase; border-radius: 3px;" target="_blank">
+            {{ 'webgriffe_bisn.subscription_mail.manage_action'|trans({}, null, localeCode) }}
+        </a>
+    </div>
+
+    <div style="text-align: center; padding: 15px; margin-bottom: 30px; font-size: 14px; border: 1px solid #ddd; border-radius: 3px;">
+        {{ 'webgriffe_bisn.manage_mail.ignore'|trans({}, null, localeCode) }}
+    </div>
+{% endblock %}

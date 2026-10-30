@@ -1,0 +1,19 @@
+{% extends '@WebgriffeSyliusBackInStockNotificationPlugin/shop/manage/_layout.html.twig' %}
+
+{% block manage_content %}
+    <h1 class="h3 mb-3">{{ 'webgriffe_bisn.manage.request_title'|trans }}</h1>
+    <p>{{ 'webgriffe_bisn.manage.request_message'|trans }}</p>
+
+    {% if error|default(false) %}
+        <div class="alert alert-danger" role="alert">{{ 'webgriffe_bisn.manage.request_error'|trans }}</div>
+    {% endif %}
+
+    <form method="post" action="{{ path('webgriffe_back_in_stock_notification_manage_request') }}" novalidate>
+        <input type="hidden" name="_token" value="{{ csrf_token('webgriffe_bisn_manage') }}">
+        <div class="mb-3">
+            <label for="webgriffe_bisn_manage_email" class="form-label">{{ 'sylius.ui.email'|trans }}</label>
+            <input type="email" id="webgriffe_bisn_manage_email" name="email" class="form-control" value="{{ email|default('') }}" required autocomplete="email">
+        </div>
+        <button type="submit" class="btn btn-primary">{{ 'webgriffe_bisn.manage.request_submit'|trans }}</button>
+    </form>
+{% endblock %}

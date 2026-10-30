@@ -9,6 +9,8 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "ext-ctype": "*",
+        "ext-filter": "*",
         "doctrine/dbal": "^2.7 || ^3.0",
         "doctrine/migrations": "^3.0",
         "doctrine/orm": "^2.18 || ^3.5",
@@ -26,7 +28,9 @@
         "symfony/http-foundation": "^6.4 || ^7.3",
         "symfony/http-kernel": "^6.4 || ^7.3",
         "symfony/options-resolver": "^6.4 || ^7.3",
+        "symfony/rate-limiter": "^6.4 || ^7.3",
         "symfony/routing": "^6.4 || ^7.3",
+        "symfony/security-csrf": "^6.4 || ^7.3",
         "symfony/translation-contracts": "^3.3",
         "symfony/ux-live-component": "^2.7",
         "symfony/ux-twig-component": "^2.7",

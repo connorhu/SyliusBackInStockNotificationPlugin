@@ -8,13 +8,44 @@ services:
             - '@webgriffe.repository.back_in_stock_notification_subscription'
             - '@router'
     
-    Webgriffe\SyliusBackInStockNotificationPlugin\Controller\SubscriptionController:
+    Webgriffe\SyliusBackInStockNotificationPlugin\Controller\ManageController:
         tags: [ 'controller.service_arguments' ]
-        calls:
-            - [ setContainer, [ '@service_container' ] ]
         arguments:
-            - '@translator'
+            - '@twig'
+            - '@router'
+            - '@security.csrf.token_manager'
             - '@webgriffe.repository.back_in_stock_notification_subscription'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Manage\ManageLinkGenerator'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Manage\ManageSession'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Session\CancelUndoSession'
+            - '@sylius.context.customer'
+            - '@sylius.context.channel'
+            - '@sylius.canonicalizer'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Manage\ManageLinkMailer'
+            - '@limiter.webgriffe_bisn_manage_link_email'
+            - '@limiter.webgriffe_bisn_manage_link_ip'
+
+    Webgriffe\SyliusBackInStockNotificationPlugin\Manage\ManageLinkGenerator:
+        arguments:
+            - '@router'
+            - '@uri_signer'
+
+    Webgriffe\SyliusBackInStockNotificationPlugin\Manage\ManageLinkMailer:
+        arguments:
+            - '@webgriffe.repository.back_in_stock_notification_subscription'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Manage\ManageLinkGenerator'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Mailer\SafeSender'
+            - '@monolog.logger'
+        tags:
+            - { name: kernel.event_listener, event: kernel.terminate, method: onTerminate }
+
+    Webgriffe\SyliusBackInStockNotificationPlugin\Manage\ManageSession:
+        arguments:
+            - '@request_stack'
+
+    Webgriffe\SyliusBackInStockNotificationPlugin\Session\CancelUndoSession:
+        arguments:
+            - '@request_stack'
     
     Webgriffe\SyliusBackInStockNotificationPlugin\Menu\AccountMenuListener:
         tags:
@@ -32,22 +63,34 @@ services:
 
     webgriffe.resolver.target: '@Webgriffe\SyliusBackInStockNotificationPlugin\Target\TargetResolver'
 
-    Webgriffe\SyliusBackInStockNotificationPlugin\Validator\SubscriptionUniqueValidator:
-        arguments:
-            - '@webgriffe.repository.back_in_stock_notification_subscription'
-            - '@sylius.repository.product_variant'
-            - '@sylius.context.customer'
-            - '@sylius.canonicalizer'
-        tags:
-            - { name: validator.constraint_validator }
-
     Webgriffe\SyliusBackInStockNotificationPlugin\Processor\SubscriptionProcessor:
         arguments:
             - '@webgriffe.factory.back_in_stock_notification_subscription'
             - '@webgriffe.repository.back_in_stock_notification_subscription'
             - '@sylius.context.channel.cached'
             - '@sylius.context.locale'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Mailer\SafeSender'
+            - '@webgriffe.resolver.target'
+            - '@webgriffe.resolver.preorderability'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Customer\AccountCustomerFinder'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Session\GuestPreorderSession'
+            - '@router'
+            - '@Webgriffe\SyliusBackInStockNotificationPlugin\Manage\ManageLinkGenerator'
+            - '@sylius.canonicalizer'
+            - '@monolog.logger'
+
+    Webgriffe\SyliusBackInStockNotificationPlugin\Mailer\SafeSender:
+        arguments:
             - '@sylius.email_sender'
+            - '@monolog.logger'
+
+    Webgriffe\SyliusBackInStockNotificationPlugin\Customer\AccountCustomerFinder:
+        arguments:
+            - '@sylius.repository.customer'
+
+    Webgriffe\SyliusBackInStockNotificationPlugin\Session\GuestPreorderSession:
+        arguments:
+            - '@request_stack'
 
     webgriffe.processor.subscription: '@Webgriffe\SyliusBackInStockNotificationPlugin\Processor\SubscriptionProcessor'
 
@@ -61,6 +104,7 @@ services:
             - '@sylius.repository.product_variant'
             - '@Webgriffe\SyliusBackInStockNotificationPlugin\Preorderability\PreorderabilityResolver'
             - '@sylius.context.channel'
+            - '@request_stack'
         tags:
             - { name: 'sylius.live_component.shop', key: 'webgriffe:sylius_shop:product:add_notification' }
 

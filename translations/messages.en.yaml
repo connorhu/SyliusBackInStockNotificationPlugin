@@ -5,9 +5,6 @@ webgriffe:
 webgriffe_bisn:
     form_submission:
         subscription_successfully: 'Successfully subscribed, check your email!'
-    deletion_submission:
-        not-successful: 'Subscription not found'
-        successful: 'Mail is deleted from the notification alert list'
     my_account_section:
         menu_label: 'Products notification'
         title: 'Products notification'
@@ -22,14 +19,40 @@ webgriffe_bisn:
     product_page:
         stock_notify_title: 'Get an email notification when the product return in stock'
         form_action: 'Notify me'
+        name: 'Your name'
     subscription_mail:
-        subscription_title: 'Product not available'
-        subscription_message: 'Your request has been registered, we will send you an email as soon as the product <a href="{url}">{product}</a> is back in stock.'
-        subscription_unsub: 'Were not you the one who subscribed to these notifications? <a href="{url}" target="_blank">Click here</a> to delete yourself.'
+        subscription_title: 'Your pre-order is registered'
+        subscription_message: 'Your request has been registered: we will write to you as soon as <a href="{url}">{product}</a> can be bought.'
+        next_queue: 'What happens next: when a copy arrives, the first one in line gets it held for {hours} hours.'
+        next_fastest: 'What happens next: when a copy arrives, everyone waiting is notified and the quickest to order gets it.'
+        manage_action: 'Manage my pre-orders'
+        account_action: 'Open my account'
+        not_you: 'If this wasn''t you, <a href="{url}" target="_blank">delete it here</a>.'
     alert_email:
         alert_title: 'Product available again'
         alert_message: 'We inform you that the product {product} is back in stock'
         alert_action: 'Buy now'
+    manage:
+        title: 'Your pre-orders'
+        intro: 'Pre-orders for {email}'
+        empty: 'There are no pre-orders to manage for this address.'
+        delete: 'Delete'
+        delete_all: 'Delete all'
+        deleted: 'Pre-orders deleted: {count}.'
+        undo: 'Undo'
+        expired_title: 'This link is no longer valid'
+        expired_message: 'Manage links work for 24 hours. We can send you a new one.'
+        request_action: 'Send me a new link'
+        request_title: 'Manage your pre-orders'
+        request_message: 'Enter the e-mail address you used for your pre-orders and we will send you a link to manage them.'
+        request_error: 'Please enter a valid e-mail address and try again.'
+        request_submit: 'Send link'
+        sent_title: 'Check your inbox'
+        sent_message: 'If there are pre-orders for that address, we have sent a link to manage them. It works for 24 hours.'
+    manage_mail:
+        title: 'Manage your pre-orders'
+        message: 'Use the button below to see and delete your pre-orders. The link works for {hours} hours.'
+        ignore: 'If you did not ask for this e-mail, you can ignore it.'
     admin:
         preorderability:
             label: 'Pre-orders'

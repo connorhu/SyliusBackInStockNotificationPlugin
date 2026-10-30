@@ -3,6 +3,7 @@
 {% block subject %}{{ 'webgriffe_bisn.subscription_mail.subscription_title'|trans({}, null, localeCode) }}{% endblock %}
 
 {% block content %}
+    {% set product_url = url('sylius_shop_product_show', {'slug': product.slug, '_locale': localeCode}) %}
     <div style="text-align: center; padding-bottom: 30px;">
         <div style="font-size: 30px; line-height: 1.2;">
             {{ 'webgriffe_bisn.subscription_mail.subscription_title'|trans({}, null, localeCode) }}
@@ -11,14 +12,33 @@
 
     <div style="text-align: center; padding-bottom: 15px; font-size: 15px;">
         {{ 'webgriffe_bisn.subscription_mail.subscription_message'|trans({
-            '{product}': subscription.product.name,
-            '{url}': url('sylius_shop_product_show', {'slug': subscription.product.slug, '_locale': subscription.product.translation.locale})
+            '{product}': product.name,
+            '{url}': product_url
         }, null, localeCode)|raw }}
     </div>
 
-    <div style="text-align: center; padding-bottom: 30px; font-size: 15px;">
-        {{ 'webgriffe_bisn.subscription_mail.subscription_unsub'|trans({
-            '{url}': url('webgriffe_back_in_stock_notification_delete_subscription', {'hash': subscription.hash})
-        }, null, localeCode)|raw }}
+    <div style="text-align: center; padding-bottom: 15px; font-size: 15px;">
+        {% if mode == 'fastest' %}
+            {{ 'webgriffe_bisn.subscription_mail.next_fastest'|trans({}, null, localeCode) }}
+        {% else %}
+            {{ 'webgriffe_bisn.subscription_mail.next_queue'|trans({'{hours}': holdHours}, null, localeCode) }}
+        {% endif %}
     </div>
+
+    {% set manage_target = accountUrl ?? manageUrl %}
+    {% if manage_target %}
+        <div style="text-align: center; padding-bottom: 20px; font-size: 15px;">
+            <a href="{{ manage_target }}" style="display: inline-block; text-align: center; background: #1abb9c; padding: 18px 28px; color: #fff; text-decoration: none; text-transform: uppercase; border-radius: 3px;" target="_blank">
+                {% if accountUrl %}
+                    {{ 'webgriffe_bisn.subscription_mail.account_action'|trans({}, null, localeCode) }}
+                {% else %}
+                    {{ 'webgriffe_bisn.subscription_mail.manage_action'|trans({}, null, localeCode) }}
+                {% endif %}
+            </a>
+        </div>
+
+        <div style="text-align: center; padding: 15px; margin-bottom: 30px; font-size: 14px; border: 1px solid #ddd; border-radius: 3px;">
+            {{ 'webgriffe_bisn.subscription_mail.not_you'|trans({'{url}': manage_target}, null, localeCode)|raw }}
+        </div>
+    {% endif %}
 {% endblock %}

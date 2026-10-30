@@ -4,15 +4,26 @@ declare(strict_types=1);
 
 namespace Webgriffe\SyliusBackInStockNotificationPlugin\Processor;
 
+use Psr\Log\LoggerInterface;
 use Sylius\Component\Channel\Context\ChannelContextInterface;
+use Sylius\Component\Core\Model\ChannelInterface;
 use Sylius\Component\Core\Model\ProductInterface;
 use Sylius\Component\Core\Model\ProductVariantInterface;
 use Sylius\Component\Customer\Model\CustomerInterface;
 use Sylius\Component\Locale\Context\LocaleContextInterface;
-use Sylius\Component\Mailer\Sender\SenderInterface;
+use Sylius\Component\User\Canonicalizer\CanonicalizerInterface;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
+use Symfony\Component\Routing\RouterInterface;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Customer\AccountCustomerFinder;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\PreorderChannelSettingsInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Factory\SubscriptionFactoryInterface;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Mailer\SafeSender;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Manage\ManageLinkGenerator;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Preorderability\PreorderabilityResolverInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Repository\SubscriptionRepositoryInterface;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Session\GuestPreorderSession;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Target\TargetResolverInterface;
 use Webmozart\Assert\Assert;
 
 final class SubscriptionProcessor implements SubscriptionProcessorInterface
@@ -22,44 +33,136 @@ final class SubscriptionProcessor implements SubscriptionProcessorInterface
         private SubscriptionRepositoryInterface $backInStockNotificationRepository,
         private ChannelContextInterface $channelContext,
         private LocaleContextInterface $localeContext,
-        private SenderInterface $sender,
+        private SafeSender $sender,
+        private TargetResolverInterface $targetResolver,
+        private PreorderabilityResolverInterface $preorderabilityResolver,
+        private AccountCustomerFinder $accountCustomerFinder,
+        private GuestPreorderSession $guestPreorderSession,
+        private RouterInterface $router,
+        private ManageLinkGenerator $manageLinkGenerator,
+        private CanonicalizerInterface $canonicalizer,
+        private LoggerInterface $logger,
     ) {
     }
 
     public function process(
-        ProductVariantInterface $productVariant,
+        ProductInterface $product,
+        ?ProductVariantInterface $variant,
         string $email,
-        ?CustomerInterface $customer = null,
-    ): SubscriptionInterface {
+        ?string $name,
+        ?CustomerInterface $customer,
+        ?string $clientIp = null,
+    ): ProcessResult {
         $channel = $this->channelContext->getChannel();
+        Assert::isInstanceOf($channel, ChannelInterface::class);
         $localeCode = $this->localeContext->getLocaleCode();
-        $product = $productVariant->getProduct();
-        Assert::isInstanceOf($product, ProductInterface::class);
+
+        if (!$this->preorderabilityResolver->isPreorderable($product, $channel)) {
+            return ProcessResult::NotPreorderable;
+        }
+
+        $target = TargetResolverInterface::TARGET_VARIANT === $this->targetResolver->target() ? $variant : null;
+        if (TargetResolverInterface::TARGET_VARIANT === $this->targetResolver->target() && null === $target) {
+            return ProcessResult::NotPreorderable;
+        }
+
+        if ($this->isRateLimited($email, $customer, $clientIp)) {
+            return ProcessResult::RateLimited;
+        }
+
+        $isGuest = null === $customer;
+        $customerEmail = $customer?->getEmail();
+        if (null !== $customerEmail && '' !== $customerEmail) {
+            $email = $customerEmail;
+        }
+        $email = trim($email);
+        $emailCanonical = $this->canonicalizer->canonicalize($email) ?? $email;
+
+        if (null !== $this->targetResolver->findActive($emailCanonical, $product, $target, $channel)) {
+            return ProcessResult::AlreadySubscribed;
+        }
+
+        // A guest e-mail that belongs to an account attaches the pre-order to that customer.
+        $customer ??= $this->accountCustomerFinder->find($emailCanonical);
 
         $subscription = $this->subscriptionFactory->createWithData(
             $channel,
             $product,
-            $productVariant,
+            $target,
             $email,
-            null,
+            $name,
             $localeCode,
             $customer,
         );
-
         $this->backInStockNotificationRepository->add($subscription);
-        /** @psalm-suppress DeprecatedMethod */
-        $this->sender->send(
-            'webgriffe_back_in_stock_notification_success_subscription',
-            [$subscription->getEmail()],
-            [
-                'subscription' => $subscription,
-                'channel' => $subscription->getChannel(),
-                'localeCode' => $subscription->getLocaleCode(),
-            ],
-            [],
-            [],
-        );
 
-        return $subscription;
+        /** @psalm-suppress MixedAssignment */
+        $id = $subscription->getId();
+        if ($isGuest && is_int($id)) {
+            $this->guestPreorderSession->remember($id);
+        }
+
+        $this->sendConfirmation($subscription, $product, $channel, $localeCode);
+
+        return ProcessResult::Created;
+    }
+
+    /**
+     * The e-mail and IP limits arrive with the rate-limit round; until then nothing is limited.
+     *
+     * @psalm-suppress UnusedParam
+     */
+    private function isRateLimited(string $email, ?CustomerInterface $customer, ?string $clientIp): bool
+    {
+        return false;
+    }
+
+    private function sendConfirmation(SubscriptionInterface $subscription, ProductInterface $product, ChannelInterface $channel, string $localeCode): void
+    {
+        $settings = $channel instanceof PreorderChannelSettingsInterface ? $channel : null;
+        $mode = $settings?->getPreorderMode() ?? PreorderChannelSettingsInterface::DEFAULT_MODE;
+        $holdHours = $settings?->getPreorderHoldHours() ?? PreorderChannelSettingsInterface::DEFAULT_HOLD_HOURS;
+
+        $context = $this->router->getContext();
+        $previousHost = $context->getHost();
+        $context->setHost($channel->getHostname() ?? 'localhost');
+
+        try {
+            $accountUrl = null;
+            $manageUrl = null;
+            if (null === $subscription->getCustomer()) {
+                $manageUrl = $this->manageLinkGenerator->generate(
+                    (string) $subscription->getEmailCanonical(),
+                    new \DateTimeImmutable(),
+                    $localeCode,
+                );
+            } else {
+                $accountUrl = $this->router->generate(
+                    'webgriffe_back_in_stock_notification_account_list_subscriptions',
+                    ['_locale' => $localeCode],
+                    UrlGeneratorInterface::ABSOLUTE_URL,
+                );
+            }
+
+            $this->sender->send(
+                'webgriffe_back_in_stock_notification_success_subscription',
+                (string) $subscription->getEmail(),
+                [
+                    'subscription' => $subscription,
+                    'product' => $product,
+                    'manageUrl' => $manageUrl,
+                    'accountUrl' => $accountUrl,
+                    'mode' => $mode,
+                    'holdHours' => $holdHours,
+                ],
+                $channel,
+                $localeCode,
+            );
+        } catch (\Throwable $exception) {
+            // The pre-order is stored; a failure while building the mail must not break the request.
+            $this->logger->error('webgriffe_bisn.confirmation_mail_failed', ['exception' => $exception]);
+        } finally {
+            $context->setHost($previousHost);
+        }
     }
 }

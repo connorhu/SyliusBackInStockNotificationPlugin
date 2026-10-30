@@ -16,8 +16,10 @@ use Sylius\Component\Core\Repository\ProductVariantRepositoryInterface;
 use Sylius\Component\Customer\Context\CustomerContextInterface;
 use Sylius\Component\Product\Resolver\ProductVariantResolverInterface;
 use Sylius\TwigHooks\LiveComponent\HookableLiveComponentTrait;
+use Symfony\Component\Form\FormError;
 use Symfony\Component\Form\FormFactoryInterface;
 use Symfony\Component\Form\FormInterface;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\UX\LiveComponent\Attribute\AsLiveComponent;
 use Symfony\UX\LiveComponent\Attribute\LiveAction;
 use Symfony\UX\LiveComponent\Attribute\LiveArg;
@@ -56,6 +58,7 @@ final class AddNotificationComponent
         ProductVariantRepositoryInterface $productVariantRepository,
         protected readonly PreorderabilityResolverInterface $preorderabilityResolver,
         protected readonly ChannelContextInterface $channelContext,
+        protected readonly RequestStack $requestStack,
     ) {
         $this->initializeProduct($productRepository);
         $this->initializeProductVariant($productVariantRepository);
@@ -75,7 +78,11 @@ final class AddNotificationComponent
 
     protected function instantiateForm(): FormInterface
     {
-        return $this->formFactory->create(SubscriptionType::class);
+        $customer = $this->customerContext->getCustomer();
+
+        return $this->formFactory->create(SubscriptionType::class, null, [
+            'ask_identity' => null === $customer || null === $customer->getEmail(),
+        ]);
     }
 
     #[PostMount]
@@ -111,24 +118,32 @@ final class AddNotificationComponent
     {
         $this->notificationSent = false;
         $this->formValues['product_variant_code'] = $this->variant?->getCode();
-        if ($this->isCustomerLoggedIn) {
-            $this->formValues['email'] = $this->customerContext->getCustomer()?->getEmail();
-        }
         $this->submitForm();
 
-        Assert::isInstanceOf($this->variant, ProductVariantInterface::class);
+        Assert::notNull($this->product);
 
         $formData = $this->getForm()->getData();
         Assert::isArray($formData);
-        $email = $formData['email'] ?? null;
+        $customer = $this->customerContext->getCustomer();
+        $email = $formData['email'] ?? $customer?->getEmail();
         Assert::stringNotEmpty($email);
-
-        $this->subscriptionProcessor->process(
+        $result = $this->subscriptionProcessor->process(
+            $this->product,
             $this->variant,
             $email,
-            $this->customerContext->getCustomer(),
+            isset($formData['name']) && is_string($formData['name']) ? $formData['name'] : null,
+            $customer,
+            $this->requestStack->getCurrentRequest()?->getClientIp(),
         );
 
+        $errorKey = $result->errorKey(null === $customer);
+        if (null !== $errorKey) {
+            $this->getForm()->addError(new FormError($errorKey));
+
+            return;
+        }
+
+        // A guest gets the same answer whether or not the address already had a pre-order.
         $this->notificationSent = true;
         $this->resetForm();
     }
