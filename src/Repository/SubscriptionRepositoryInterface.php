@@ -61,4 +61,22 @@ interface SubscriptionRepositoryInterface extends RepositoryInterface
      * The newest pre-order of an e-mail address (canonical form) or of a customer on a channel, in any status.
      */
     public function findNewestByEmailOrCustomer(string $emailCanonical, ?CustomerInterface $customer, ChannelInterface $channel): ?SubscriptionInterface;
+
+    /**
+     * One active (waiting or notified) subscription per target (channel, product and, for the variant target, variant),
+     * lowest id first; the restock run loads each target's subscriptions with findActiveByTarget().
+     *
+     * @return list<SubscriptionInterface>
+     */
+    public function findRestockTargets(): array;
+
+    /**
+     * Active holds (notified, holdUntil > now) on the given variants in every channel, keyed by variant id; stock is shared
+     * by all channels, so a unit held in one channel is not free in another. Variants without a hold are left out.
+     *
+     * @param list<ProductVariantInterface> $variants
+     *
+     * @return array<int, int>
+     */
+    public function countActiveHoldsByVariant(array $variants, \DateTimeImmutable $now): array;
 }
