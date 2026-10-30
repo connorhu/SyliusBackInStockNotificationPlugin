@@ -19,6 +19,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Session\Session;
 use Symfony\Component\HttpFoundation\Session\Storage\MockArraySessionStorage;
+use Symfony\Component\Routing\Exception\RouteNotFoundException;
 use Symfony\Component\Routing\RequestContext;
 use Symfony\Component\Routing\RouterInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Customer\AccountCustomerFinder;
@@ -100,6 +101,7 @@ final class SubscriptionProcessorTest extends TestCase
             $this->guestSession,
             $router,
             $canonicalizer,
+            new NullLogger(),
         );
     }
 
@@ -214,6 +216,40 @@ final class SubscriptionProcessorTest extends TestCase
         self::assertSame('original.host', $this->routerContext->getHost());
     }
 
+    public function testRoutingFailureKeepsThePreorderAndSkipsTheMail(): void
+    {
+        $customer = $this->accountCustomer('anna@pelda.hu');
+        $router = $this->createMock(RouterInterface::class);
+        $router->method('getContext')->willReturn($this->routerContext);
+        $router->method('generate')->willThrowException(new RouteNotFoundException('no route'));
+        $canonicalizer = new Canonicalizer();
+        $channelContext = $this->createMock(ChannelContextInterface::class);
+        $channelContext->method('getChannel')->willReturn($this->channel);
+        $localeContext = $this->createMock(LocaleContextInterface::class);
+        $localeContext->method('getLocaleCode')->willReturn('hu_HU');
+        $processor = new SubscriptionProcessor(
+            new SubscriptionFactory(Subscription::class, $canonicalizer),
+            $this->repository,
+            $channelContext,
+            $localeContext,
+            new SafeSender($this->sender, new NullLogger()),
+            $this->targetResolver,
+            $this->preorderability,
+            new AccountCustomerFinder($this->customerRepository),
+            $this->guestSession,
+            $router,
+            $canonicalizer,
+            new NullLogger(),
+        );
+        $this->repository->expects(self::once())->method('add');
+        $this->sender->expects(self::never())->method('send');
+
+        $result = $processor->process($this->product, null, 'anna@pelda.hu', null, $customer);
+
+        self::assertSame(ProcessResult::Created, $result);
+        self::assertSame('original.host', $this->routerContext->getHost());
+    }
+
     public function testGuestCreateIsRememberedInSession(): void
     {
         $this->customerRepository->method('findOneBy')->willReturn(null);
@@ -310,6 +346,7 @@ final class SubscriptionProcessorTest extends TestCase
             $this->guestSession,
             $router,
             $canonicalizer,
+            new NullLogger(),
         );
     }
 }

@@ -30,7 +30,6 @@ use Symfony\UX\LiveComponent\DefaultActionTrait;
 use Symfony\UX\TwigComponent\Attribute\PostMount;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Form\SubscriptionType;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Preorderability\PreorderabilityResolverInterface;
-use Webgriffe\SyliusBackInStockNotificationPlugin\Processor\ProcessResult;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Processor\SubscriptionProcessorInterface;
 use Webmozart\Assert\Assert;
 
@@ -137,18 +136,14 @@ final class AddNotificationComponent
             $this->requestStack->getCurrentRequest()?->getClientIp(),
         );
 
-        if (ProcessResult::NotPreorderable === $result) {
-            $this->getForm()->addError(new FormError('webgriffe_bisn.subscription.not_preorderable'));
-
-            return;
-        }
-        if (ProcessResult::RateLimited === $result) {
-            $this->getForm()->addError(new FormError('webgriffe_bisn.subscription.rate_limited'));
+        $errorKey = $result->errorKey(null === $customer);
+        if (null !== $errorKey) {
+            $this->getForm()->addError(new FormError($errorKey));
 
             return;
         }
 
-        // An already pre-ordered address gets the same answer, so the form never reveals who has pre-ordered.
+        // A guest gets the same answer whether or not the address already had a pre-order.
         $this->notificationSent = true;
         $this->resetForm();
     }

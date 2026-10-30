@@ -32,16 +32,6 @@ services:
 
     webgriffe.resolver.target: '@Webgriffe\SyliusBackInStockNotificationPlugin\Target\TargetResolver'
 
-    Webgriffe\SyliusBackInStockNotificationPlugin\Validator\SubscriptionUniqueValidator:
-        arguments:
-            - '@webgriffe.resolver.target'
-            - '@sylius.repository.product_variant'
-            - '@sylius.context.customer'
-            - '@sylius.canonicalizer'
-            - '@sylius.context.channel'
-        tags:
-            - { name: validator.constraint_validator }
-
     Webgriffe\SyliusBackInStockNotificationPlugin\Processor\SubscriptionProcessor:
         arguments:
             - '@webgriffe.factory.back_in_stock_notification_subscription'
@@ -55,6 +45,7 @@ services:
             - '@Webgriffe\SyliusBackInStockNotificationPlugin\Session\GuestPreorderSession'
             - '@router'
             - '@sylius.canonicalizer'
+            - '@monolog.logger'
 
     Webgriffe\SyliusBackInStockNotificationPlugin\Mailer\SafeSender:
         arguments:

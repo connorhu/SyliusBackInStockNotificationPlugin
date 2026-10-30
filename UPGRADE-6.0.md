@@ -13,7 +13,6 @@
 - `SubscriptionInterface` gains `getProduct()` / `setProduct()`, `getName()` / `setName()`, `getEmailCanonical()` and the
   lifecycle/hold getters. `getProductVariant()` is now nullable in the database as well (product target).
 - Grid fields/filters named `notify` are now `status`; the templates `.../grid/field/notify.html.twig` are renamed to `status.html.twig`.
-- `SubscriptionUniqueValidator` takes the canonicalizer as 4th constructor argument and only counts active subscriptions.
 
 ## Target
 
@@ -47,11 +46,13 @@ The `down()` removes subscriptions without a variant, since the old schema canno
   not pre-orderable in the current channel, treats e-mail addresses case-insensitively, and attaches the pre-order to the customer when the
   address belongs to a registered account (a customer with a shop user). A logged-in customer's own e-mail wins over the typed one.
   `SubscriptionProcessor` takes new constructor arguments (SafeSender, target resolver, pre-orderability resolver, `AccountCustomerFinder`,
-  `GuestPreorderSession`, router, canonicalizer); if you redefined the service, copy the new arguments from `config/services.yaml`.
+  `GuestPreorderSession`, router, canonicalizer, logger); if you redefined the service, copy the new arguments from `config/services.yaml`.
 - The confirmation e-mail (`webgriffe_back_in_stock_notification_success_subscription`) gets the variables `subscription`, `product`, `mode`,
   `holdHours`, `manageUrl` and `accountUrl`; the translation key `subscription_unsub` is replaced by `not_you`. Mails go through `SafeSender`,
   which logs `webgriffe_bisn.mail_failed` instead of throwing.
 - `SubscriptionType` gains the `name` field and an unmapped honeypot `website`; the `ask_identity` option (default `true`) turns the `name` and
   `email` fields off for a logged-in customer. `AddNotificationComponent` takes the request stack as last constructor argument.
-- `SubscriptionUniqueValidator` now takes the target resolver (instead of the repository) first and the channel context last.
+- The `SubscriptionUnique` constraint, its validator and the service are removed: a form error for an already pre-ordered address would
+  reveal who has pre-ordered. Duplicates are detected in the processor (`ProcessResult::AlreadySubscribed`); a guest sees the same success
+  state as for a new pre-order (nothing stored, no second mail), a logged-in customer sees the `webgriffe_bisn.subscription.already_saved` error.
 - `GuestPreorderSession` remembers the ids of the pre-orders a guest created (session key `webgriffe_bisn_guest_preorders`).

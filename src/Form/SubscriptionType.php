@@ -13,7 +13,6 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 use Symfony\Component\Validator\Constraints\Email;
 use Symfony\Component\Validator\Constraints\Length;
 use Symfony\Component\Validator\Constraints\NotBlank;
-use Webgriffe\SyliusBackInStockNotificationPlugin\Validator\SubscriptionUnique;
 
 /**
  * @TODO: Transform this in an entity type?
@@ -55,10 +54,6 @@ final class SubscriptionType extends AbstractType
         $resolver->setDefaults([
             'ask_identity' => true,
             'validation_groups' => ['webgriffe_sylius_back_in_stock_notification_plugin'],
-            'constraints' => [new SubscriptionUnique(
-                null,
-                ['webgriffe_sylius_back_in_stock_notification_plugin'],
-            )],
         ]);
         $resolver->setAllowedTypes('ask_identity', 'bool');
     }

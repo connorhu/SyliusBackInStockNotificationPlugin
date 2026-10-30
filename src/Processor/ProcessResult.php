@@ -10,4 +10,18 @@ enum ProcessResult: string
     case AlreadySubscribed = 'already_subscribed';
     case NotPreorderable = 'not_preorderable';
     case RateLimited = 'rate_limited';
+
+    /**
+     * The form error to show for this outcome, or null for the success state. A guest never learns that an address
+     * already has a pre-order: for them a duplicate looks exactly like a created one.
+     */
+    public function errorKey(bool $isGuest): ?string
+    {
+        return match ($this) {
+            self::Created => null,
+            self::AlreadySubscribed => $isGuest ? null : 'webgriffe_bisn.subscription.already_saved',
+            self::NotPreorderable => 'webgriffe_bisn.subscription.not_preorderable',
+            self::RateLimited => 'webgriffe_bisn.subscription.rate_limited',
+        };
+    }
 }

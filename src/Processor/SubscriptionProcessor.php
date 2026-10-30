@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Webgriffe\SyliusBackInStockNotificationPlugin\Processor;
 
+use Psr\Log\LoggerInterface;
 use Sylius\Component\Channel\Context\ChannelContextInterface;
 use Sylius\Component\Core\Model\ChannelInterface;
 use Sylius\Component\Core\Model\ProductInterface;
@@ -38,6 +39,7 @@ final class SubscriptionProcessor implements SubscriptionProcessorInterface
         private GuestPreorderSession $guestPreorderSession,
         private RouterInterface $router,
         private CanonicalizerInterface $canonicalizer,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -147,6 +149,9 @@ final class SubscriptionProcessor implements SubscriptionProcessorInterface
                 $channel,
                 $localeCode,
             );
+        } catch (\Throwable $exception) {
+            // The pre-order is stored; a failure while building the mail must not break the request.
+            $this->logger->error('webgriffe_bisn.confirmation_mail_failed', ['exception' => $exception]);
         } finally {
             $context->setHost($previousHost);
         }
