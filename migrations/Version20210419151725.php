@@ -18,7 +18,8 @@ final class Version20210419151725 extends AbstractMigration
     public function up(Schema $schema): void
     {
         if ($this->connection->getDatabasePlatform() instanceof PostgreSQLPlatform) {
-            $this->addSql('CREATE TABLE webgriffe_back_in_stock_notification_subscription (id SERIAL NOT NULL, customer_id INT DEFAULT NULL, product_variant_id INT NOT NULL, channel_id INT NOT NULL, hash VARCHAR(255) NOT NULL, email VARCHAR(255) NOT NULL, local_code VARCHAR(255) NOT NULL, created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL, updated_at TIMESTAMP(0) WITHOUT TIME ZONE DEFAULT NULL, PRIMARY KEY(id))');
+            $this->addSql('CREATE SEQUENCE webgriffe_back_in_stock_notification_subscription_id_seq INCREMENT BY 1 MINVALUE 1 START 1');
+            $this->addSql('CREATE TABLE webgriffe_back_in_stock_notification_subscription (id INT NOT NULL, customer_id INT DEFAULT NULL, product_variant_id INT NOT NULL, channel_id INT NOT NULL, hash VARCHAR(255) NOT NULL, email VARCHAR(255) NOT NULL, local_code VARCHAR(255) NOT NULL, created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL, updated_at TIMESTAMP(0) WITHOUT TIME ZONE DEFAULT NULL, PRIMARY KEY(id))');
             $this->addSql('CREATE UNIQUE INDEX UNIQ_1F046E38D1B862B8 ON webgriffe_back_in_stock_notification_subscription (hash)');
             $this->addSql('CREATE INDEX IDX_1F046E389395C3F3 ON webgriffe_back_in_stock_notification_subscription (customer_id)');
             $this->addSql('CREATE INDEX IDX_1F046E38A80EF684 ON webgriffe_back_in_stock_notification_subscription (product_variant_id)');
@@ -38,6 +39,13 @@ final class Version20210419151725 extends AbstractMigration
 
     public function down(Schema $schema): void
     {
+        if ($this->connection->getDatabasePlatform() instanceof PostgreSQLPlatform) {
+            $this->addSql('DROP TABLE webgriffe_back_in_stock_notification_subscription');
+            $this->addSql('DROP SEQUENCE webgriffe_back_in_stock_notification_subscription_id_seq');
+
+            return;
+        }
+
         $this->addSql('DROP TABLE webgriffe_back_in_stock_notification_subscription');
     }
 }

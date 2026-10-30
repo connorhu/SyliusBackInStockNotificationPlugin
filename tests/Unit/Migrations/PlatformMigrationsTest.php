@@ -21,7 +21,9 @@ final class PlatformMigrationsTest extends TestCase
     {
         $sql = $this->upSql(Version20210419151725::class, new PostgreSQLPlatform());
 
-        self::assertStringContainsString('CREATE TABLE webgriffe_back_in_stock_notification_subscription (id SERIAL', $sql);
+        self::assertStringContainsString('CREATE TABLE webgriffe_back_in_stock_notification_subscription (id INT NOT NULL', $sql);
+        self::assertStringContainsString('CREATE SEQUENCE webgriffe_back_in_stock_notification_subscription_id_seq INCREMENT BY 1 MINVALUE 1 START 1', $sql);
+        self::assertStringNotContainsString('SERIAL', $sql);
         self::assertStringNotContainsString('ENGINE = InnoDB', $sql);
         self::assertStringNotContainsString('TINYINT', $sql);
         self::assertStringNotContainsString('AUTO_INCREMENT', $sql);
@@ -71,6 +73,10 @@ final class PlatformMigrationsTest extends TestCase
             $initial = $this->migration(Version20210419151725::class, $platform);
             $initial->down(new Schema());
             self::assertStringContainsString('DROP TABLE webgriffe_back_in_stock_notification_subscription', $this->statements($initial));
+            self::assertSame(
+                $platform instanceof PostgreSQLPlatform,
+                str_contains($this->statements($initial), 'DROP SEQUENCE webgriffe_back_in_stock_notification_subscription_id_seq'),
+            );
 
             $notify = $this->migration(Version20220523152238::class, $platform);
             $notify->down(new Schema());
