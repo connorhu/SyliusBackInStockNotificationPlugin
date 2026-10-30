@@ -76,7 +76,16 @@ final class SubscriptionProcessor implements SubscriptionProcessorInterface
         $email = trim($email);
         $emailCanonical = $this->canonicalizer->canonicalize($email) ?? $email;
 
-        if (null !== $this->targetResolver->findActive($emailCanonical, $product, $target, $channel)) {
+        $existing = $this->targetResolver->findActive($emailCanonical, $product, $target, $channel);
+        if (null !== $existing) {
+            // A guest sees the same "pre-ordered" state after a reload as after a created pre-order, so a reload does
+            // not reveal whether the address had pre-ordered before.
+            /** @psalm-suppress MixedAssignment */
+            $existingId = $existing->getId();
+            if ($isGuest && is_int($existingId)) {
+                $this->guestPreorderSession->remember($existingId);
+            }
+
             return ProcessResult::AlreadySubscribed;
         }
 

@@ -9,6 +9,7 @@ use PHPUnit\Framework\TestCase;
 use Sylius\Component\Channel\Context\ChannelContextInterface;
 use Sylius\Component\Core\Model\Channel;
 use Sylius\Component\Core\Model\Customer;
+use Sylius\Component\Core\Model\Product;
 use Sylius\Component\Core\Model\ProductVariant;
 use Sylius\Component\Customer\Context\CustomerContextInterface;
 use Sylius\Component\Customer\Model\CustomerInterface;
@@ -23,6 +24,7 @@ use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 use Twig\Environment;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Account\AccountRow;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Controller\AccountController;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Customer\SubscriptionRestorer;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\Subscription;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionStatus;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Repository\SubscriptionRepositoryInterface;
@@ -67,6 +69,7 @@ final class AccountControllerTest extends TestCase
             $this->undo,
             $customerContext,
             $channelContext,
+            new SubscriptionRestorer($this->repository),
         );
     }
 
@@ -148,6 +151,28 @@ final class AccountControllerTest extends TestCase
 
         self::assertSame(SubscriptionStatus::WAITING, $subscription->getStatus());
         self::assertSame([], $this->undo->peek(new \DateTimeImmutable()));
+    }
+
+    public function testRestoreKeepsCancelledWhenTheSameTargetIsPreorderedAgain(): void
+    {
+        $product = new Product();
+        $channel = new Channel();
+        $subscription = $this->subscription(5, $this->customer);
+        $subscription->setProduct($product);
+        $subscription->setChannel($channel);
+        $subscription->markCancelled(new \DateTimeImmutable());
+        $this->undo->remember([5], new \DateTimeImmutable());
+        $this->repository->method('findCancelledByIds')->willReturn([$subscription]);
+        $this->repository->method('findActiveOne')->with('anna@example.com', $product, null, $channel)->willReturn($this->subscription(6, $this->customer));
+        $this->repository->expects(self::never())->method('add');
+        $request = $this->post();
+
+        $this->controller->restoreAction($request);
+
+        self::assertSame(SubscriptionStatus::CANCELLED, $subscription->getStatus());
+        $session = $request->getSession();
+        self::assertInstanceOf(Session::class, $session);
+        self::assertSame(['webgriffe_bisn.restore_refused'], $session->getFlashBag()->get('info'));
     }
 
     public function testRowStates(): void

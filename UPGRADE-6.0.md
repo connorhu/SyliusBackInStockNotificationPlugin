@@ -146,3 +146,26 @@ The `down()` removes subscriptions without a variant, since the old schema canno
 - Translations: complete `en` and `hu` (`webgriffe_bisn.product_page.*`, `my_account_section.*`, `admin.*`, `status.*`; flash
   `webgriffe_bisn.admin.cancelled`). Removed `my_account_section.product/option/actions/simple` and `admin.notified/not-notified` from `en`.
 - Behat: the account scenario cancels (`I cancel the first subscription`) and sees the undo bar instead of deleting.
+
+## Final review fixes
+
+- Restock: per variant, active holds beyond the variant's sellable units (the unit was sold, for example to an earlier-notified
+  pre-order, or the stock was corrected) are released, newest holder first, and an expired hold whose unit is gone is released the same
+  way. Neither gets the `hold_expired` mail (nobody is next in line for a unit that does not exist); the holder goes back to `waiting` if
+  the target has no sellable unit at all and otherwise stays `notified` without a hold. `RestockReport::getExpired()` counts them too.
+  The `hold_expired` mail is therefore sent only while the unit is still there (`sellable` is then always true).
+- `PreorderStateResolver` returns `HeldForYou` only while the held variant still has a sellable unit in the channel.
+- `OrderCompletedListener` also fulfils the pre-orders claimed in the buyer's session (`ClaimSession`), whatever the checkout e-mail,
+  still only when the order contains a variant of their target. Its constructor takes `ClaimSession` as a new last argument.
+- New service `Customer\SubscriptionRestorer`: every undo (manage page, account page, product-page component) restores a cancelled
+  pre-order only while the same person (canonical e-mail, or customer) has no other active pre-order for the same target and channel;
+  otherwise it stays cancelled and the page shows the neutral `webgriffe_bisn.restore_refused` flash (product page:
+  `webgriffe_bisn.product_page.restore_refused`, live prop `restoreRefused`). `ManageController`, `AccountController` and
+  `AddNotificationComponent` take it as a new last constructor argument.
+- `SubscriptionProcessor`: a guest's duplicate (`AlreadySubscribed`) is remembered in `GuestPreorderSession` like a created pre-order, so a
+  reload shows the same "pre-ordered" state in both cases.
+- `AlertCommand` takes `%kernel.project_dir%` and `%kernel.environment%` (before the optional name) and locks on
+  `<command name>-<hash of both>`: the default lock store is system wide, so installations or environments on one host no longer skip
+  each other's runs.
+- Hold deadlines are printed in the `display_timezone` everywhere: the `alert` mail uses `format_datetime` with the subscription's locale,
+  and the admin grid column `hold_until` is a `twig` field (`admin/subscription/grid/field/hold_until.html.twig`).

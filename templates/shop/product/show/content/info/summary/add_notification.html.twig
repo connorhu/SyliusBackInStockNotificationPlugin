@@ -9,6 +9,7 @@
 {% set state = view.state.value %}
 
 {% set show = cancelled
+    or restoreRefused
     or (notificationSent and not isCustomerLoggedIn)
     or state in ['held_for_you', 'preordered', 'can_preorder']
     or (state == 'held_for_others' and this.preorderable) %}
@@ -24,6 +25,10 @@
                     {{ 'webgriffe_bisn.product_page.undo'|trans }}
                 </button>
             </div>
+        </div>
+    {% elseif restoreRefused %}
+        <div class="card-body">
+            <div class="alert alert-info mb-0" role="status">{{ 'webgriffe_bisn.product_page.restore_refused'|trans }}</div>
         </div>
     {% elseif notificationSent and not isCustomerLoggedIn %}
         <div class="card-body">

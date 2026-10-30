@@ -39,6 +39,7 @@ webgriffe_bisn:
         cancel: 'Cancel pre-order'
         cancelled: 'Pre-order cancelled.'
         undo: 'Undo'
+        restore_refused: 'This pre-order was not restored: the same item is already pre-ordered.'
         guest_manage_hint: 'To cancel it, use the link in the e-mail we sent you.'
         held_for_you_label: 'Held for you'
         held_for_you: 'A copy is held for you until {until}.'

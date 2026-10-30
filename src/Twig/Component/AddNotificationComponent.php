@@ -30,6 +30,7 @@ use Symfony\UX\LiveComponent\ComponentWithFormTrait;
 use Symfony\UX\LiveComponent\DefaultActionTrait;
 use Symfony\UX\TwigComponent\Attribute\PostMount;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Customer\SubscriptionOwnership;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Customer\SubscriptionRestorer;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Form\SubscriptionType;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Preorderability\PreorderabilityResolverInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Processor\ProcessResult;
@@ -65,6 +66,10 @@ final class AddNotificationComponent
     #[LiveProp]
     public bool $cancelled = false;
 
+    /** Whether the last undo was refused because the same target is pre-ordered again (the pre-order stays cancelled). */
+    #[LiveProp]
+    public bool $restoreRefused = false;
+
     private ?PreorderView $view = null;
 
     public function __construct(
@@ -81,6 +86,7 @@ final class AddNotificationComponent
         protected readonly ChannelContextInterface $channelContext,
         protected readonly RequestStack $requestStack,
         protected readonly LoggerInterface $logger,
+        protected readonly SubscriptionRestorer $subscriptionRestorer,
     ) {
         $this->initializeProduct($productRepository);
         $this->initializeProductVariant($productVariantRepository);
@@ -241,6 +247,7 @@ final class AddNotificationComponent
     public function cancel(): void
     {
         $this->view = null;
+        $this->restoreRefused = false;
         $subscription = $this->getView()->subscription;
         $customer = $this->customerContext->getCustomer();
         if (null !== $subscription && null !== $customer && $subscription->isActive() && SubscriptionOwnership::isOwnedBy($subscription, $customer)) {
@@ -260,6 +267,7 @@ final class AddNotificationComponent
     #[LiveAction]
     public function restore(): void
     {
+        $this->restoreRefused = false;
         $customer = $this->customerContext->getCustomer();
         $channel = $this->channelContext->getChannel();
         if (null !== $customer && $channel instanceof ChannelInterface) {
@@ -269,9 +277,8 @@ final class AddNotificationComponent
                 $channel,
             );
             foreach ($subscriptions as $subscription) {
-                if (SubscriptionOwnership::isOwnedBy($subscription, $customer)) {
-                    $subscription->restore();
-                    $this->subscriptionRepository->add($subscription);
+                if (SubscriptionOwnership::isOwnedBy($subscription, $customer) && !$this->subscriptionRestorer->restore($subscription)) {
+                    $this->restoreRefused = true;
                 }
             }
         }

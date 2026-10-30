@@ -10,6 +10,7 @@ use Sylius\Component\Customer\Model\CustomerInterface;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\Session\FlashBagAwareSessionInterface;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
@@ -18,6 +19,7 @@ use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 use Twig\Environment;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Account\AccountRow;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Customer\SubscriptionOwnership;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Customer\SubscriptionRestorer;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\PreorderChannelSettingsInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionStatus;
@@ -42,6 +44,7 @@ final class AccountController
         private CancelUndoSession $cancelUndoSession,
         private CustomerContextInterface $customerContext,
         private ChannelContextInterface $channelContext,
+        private SubscriptionRestorer $subscriptionRestorer,
     ) {
     }
 
@@ -93,10 +96,16 @@ final class AccountController
             $this->emailCanonical($customer),
             $this->channelContext->getChannel(),
         );
+        $refused = false;
         foreach ($subscriptions as $subscription) {
             if (SubscriptionOwnership::isOwnedBy($subscription, $customer)) {
-                $subscription->restore();
-                $this->subscriptionRepository->add($subscription);
+                $refused = !$this->subscriptionRestorer->restore($subscription) || $refused;
+            }
+        }
+        if ($refused) {
+            $session = $request->hasSession() ? $request->getSession() : null;
+            if ($session instanceof FlashBagAwareSessionInterface) {
+                $session->getFlashBag()->add('info', SubscriptionRestorer::REFUSED_FLASH);
             }
         }
 

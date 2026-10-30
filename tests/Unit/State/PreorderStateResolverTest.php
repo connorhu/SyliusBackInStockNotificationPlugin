@@ -118,6 +118,20 @@ final class PreorderStateResolverTest extends TestCase
         self::assertNull($view->position);
     }
 
+    public function testHoldOnASoldUnitIsNotHeldForYou(): void
+    {
+        $variant = $this->variant(0);
+        $this->customer = $this->customer('anna@example.com');
+        $anna = $this->subscription('anna@example.com', '-1 day', $this->customer);
+        $anna->markNotified(new \DateTimeImmutable('-1 hour'), $variant, new \DateTimeImmutable('+5 hours'));
+
+        $view = $this->resolve();
+
+        self::assertSame(PreorderState::Preordered, $view->state);
+        self::assertSame($anna, $view->subscription);
+        self::assertNull($view->holdUntil);
+    }
+
     public function testHeldForOthers(): void
     {
         $variant = $this->variant(1);

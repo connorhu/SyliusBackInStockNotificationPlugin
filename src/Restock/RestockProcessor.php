@@ -19,7 +19,7 @@ use Webgriffe\SyliusBackInStockNotificationPlugin\Repository\SubscriptionReposit
 use Webgriffe\SyliusBackInStockNotificationPlugin\Target\TargetResolverInterface;
 
 /**
- * One restock run: for every target with active pre-orders it expires lapsed holds, moves notified pre-orders of a
+ * One restock run: for every target with active pre-orders it expires lapsed holds, releases holds whose unit is gone, moves notified pre-orders of a
  * sold-out target back to waiting and notifies waiting ones while there are free units (sellable units minus active
  * holds). Each target's changes are flushed before its mails are sent, so a crash loses a mail at worst and never
  * repeats one.
@@ -29,6 +29,7 @@ use Webgriffe\SyliusBackInStockNotificationPlugin\Target\TargetResolverInterface
  *     mode: string,
  *     sellable: bool,
  *     expire: list<SubscriptionInterface>,
+ *     release: list<SubscriptionInterface>,
  *     rewait: list<SubscriptionInterface>,
  *     notify: list<array{SubscriptionInterface, ?ProductVariantInterface, ?\DateTimeImmutable}>,
  * }
@@ -89,7 +90,7 @@ final class RestockProcessor
                 continue;
             }
 
-            if ([] === $plan['expire'] && [] === $plan['rewait'] && [] === $plan['notify']) {
+            if ([] === $plan['expire'] && [] === $plan['release'] && [] === $plan['rewait'] && [] === $plan['notify']) {
                 continue;
             }
 
@@ -107,7 +108,7 @@ final class RestockProcessor
                 return $report;
             }
 
-            $report->addExpired(count($plan['expire']));
+            $report->addExpired(count($plan['expire']) + count($plan['release']));
             $report->addRewaited(count($plan['rewait']));
             foreach ($plan['notify'] as [, $heldVariant]) {
                 $report->addNotified(null !== $heldVariant);
@@ -143,22 +144,6 @@ final class RestockProcessor
             $targetSellable = $targetSellable || $units > 0;
         }
 
-        // 1. Expire: a hold that ran out releases its unit; the holder stays notified and may still buy.
-        $expire = [];
-        $holders = [];
-        foreach ($subscriptions as $subscription) {
-            if (SubscriptionStatus::NOTIFIED !== $subscription->getStatus() || null === $subscription->getHeldVariant()) {
-                continue;
-            }
-            $holdUntil = $subscription->getHoldUntil();
-            if (null === $holdUntil || $holdUntil <= $now) {
-                $expire[] = $subscription;
-
-                continue;
-            }
-            $holders[spl_object_id($subscription)] = true;
-        }
-
         // Active holds on the target's variants in every channel: stock is shared, so a unit held anywhere is not free.
         // Nothing is pending in memory (each target is flushed before the next one), so the database count is current.
         $activeHolds = [];
@@ -166,7 +151,49 @@ final class RestockProcessor
             $activeHolds['id-' . $variantId] = $holds;
         }
 
-        // 2. Re-wait: a notified pre-order without an active hold whose target sold out goes back to waiting,
+        // 1. Holds whose unit is gone (sold, for example to an earlier-notified pre-order, or a stock correction): per
+        //    variant, the newest holders beyond the sellable units lose their hold. Nobody is next in line for a unit
+        //    that does not exist, so no "hold expired" mail is sent for them.
+        $release = [];
+        $holders = [];
+        $expiredByVariant = [];
+        foreach (array_reverse($subscriptions) as $subscription) {
+            $heldVariant = $subscription->getHeldVariant();
+            if (SubscriptionStatus::NOTIFIED !== $subscription->getStatus() || null === $heldVariant) {
+                continue;
+            }
+            $key = self::key($heldVariant);
+            $holdUntil = $subscription->getHoldUntil();
+            if (null === $holdUntil || $holdUntil <= $now) {
+                $expiredByVariant[$key][] = $subscription;
+
+                continue;
+            }
+            if (($activeHolds[$key] ?? 0) > ($sellable[$key] ?? 0)) {
+                $release[] = $subscription;
+                $activeHolds[$key] = ($activeHolds[$key] ?? 0) - 1;
+
+                continue;
+            }
+            $holders[spl_object_id($subscription)] = true;
+        }
+
+        // 2. Expire: a hold that ran out releases its unit; the holder stays notified and may still buy. The "hold
+        //    expired" mail goes out only while the unit is still there for the next one in line.
+        $expire = [];
+        foreach ($expiredByVariant as $key => $expired) {
+            $free = ($sellable[$key] ?? 0) - ($activeHolds[$key] ?? 0);
+            foreach (array_reverse($expired) as $subscription) {
+                if ($free > 0) {
+                    $expire[] = $subscription;
+                    --$free;
+                } else {
+                    $release[] = $subscription;
+                }
+            }
+        }
+
+        // 3. Re-wait: a notified pre-order without an active hold whose target sold out goes back to waiting,
         //    keeping its createdAt (queue position). Units held for others do not count as sold out: a notified
         //    pre-order may still buy them.
         $rewait = [];
@@ -178,7 +205,7 @@ final class RestockProcessor
             }
         }
 
-        // 3. Allocate free units (sellable minus active holds) to waiting pre-orders.
+        // 4. Allocate free units (sellable minus active holds) to waiting pre-orders.
         $waiting = array_values(array_filter(
             $subscriptions,
             static fn (SubscriptionInterface $subscription): bool => SubscriptionStatus::WAITING === $subscription->getStatus(),
@@ -215,6 +242,7 @@ final class RestockProcessor
             'mode' => $mode,
             'sellable' => $targetSellable,
             'expire' => $expire,
+            'release' => $release,
             'rewait' => $rewait,
             'notify' => $notify,
             'now' => $now,
@@ -226,7 +254,7 @@ final class RestockProcessor
      */
     private function apply(array $plan): void
     {
-        foreach ($plan['expire'] as $subscription) {
+        foreach ([...$plan['expire'], ...$plan['release']] as $subscription) {
             $subscription->releaseHold();
         }
         foreach ($plan['rewait'] as $subscription) {

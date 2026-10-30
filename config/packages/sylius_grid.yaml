@@ -44,11 +44,11 @@ sylius_grid:
                     options:
                         template: "@WebgriffeSyliusBackInStockNotificationPlugin/admin/subscription/grid/field/status.html.twig"
                 hold_until:
-                    type: datetime
+                    type: twig
                     label: webgriffe_bisn.admin.hold_until
                     sortable: holdUntil
                     options:
-                        format: d-m-Y H:i
+                        template: "@WebgriffeSyliusBackInStockNotificationPlugin/admin/subscription/grid/field/hold_until.html.twig"
                 created_at:
                     type: datetime
                     label: sylius.ui.date

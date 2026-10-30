@@ -24,6 +24,7 @@ use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Session\Session;
 use Symfony\Component\HttpFoundation\Session\Storage\MockArraySessionStorage;
 use Symfony\Component\Validator\Validation;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Customer\SubscriptionRestorer;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\Subscription;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionStatus;
@@ -179,6 +180,26 @@ final class AddNotificationComponentTest extends TestCase
         self::assertFalse($component->cancelled);
     }
 
+    public function testRestoreKeepsCancelledWhenTheSameTargetIsPreorderedAgain(): void
+    {
+        $this->customer = $this->customer('anna@example.com');
+        $subscription = $this->subscription($this->customer);
+        $subscription->markCancelled(new \DateTimeImmutable());
+        $again = new Subscription();
+        (new CancelUndoSession($this->requestStack))->remember([7], new \DateTimeImmutable());
+        $this->repository->method('findCancelledByIds')->willReturn([$subscription]);
+        $this->repository->method('findActiveOne')->with('anna@example.com', $this->product, null, $this->channel)->willReturn($again);
+        $this->repository->expects(self::never())->method('add');
+        $component = $this->component();
+        $component->cancelled = true;
+
+        $component->restore();
+
+        self::assertSame(SubscriptionStatus::CANCELLED, $subscription->getStatus());
+        self::assertFalse($component->cancelled);
+        self::assertTrue($component->restoreRefused);
+    }
+
     public function testRestoreAfterTenMinutesDoesNothing(): void
     {
         $this->customer = $this->customer('anna@example.com');
@@ -225,6 +246,7 @@ final class AddNotificationComponentTest extends TestCase
             $channelContext,
             $this->requestStack,
             new NullLogger(),
+            new SubscriptionRestorer($this->repository),
         );
         $component->product = $this->product;
 

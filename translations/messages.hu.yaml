@@ -39,6 +39,7 @@ webgriffe_bisn:
         cancel: 'Visszavonás'
         cancelled: 'Az előjegyzést visszavontad.'
         undo: 'Mégse'
+        restore_refused: 'Ezt az előjegyzést nem állítottuk vissza: ugyanez a termék már elő van jegyezve.'
         guest_manage_hint: 'Visszavonni a levelünkben kapott hivatkozással tudod.'
         held_for_you_label: 'Félretéve neked'
         held_for_you: 'Egy példányt {until}-ig félreteszünk neked.'
