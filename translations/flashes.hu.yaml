@@ -1,3 +1,6 @@
 webgriffe_bisn:
     claim:
         expired: 'Ez a link már nem érvényes: a példányt már nem tartjuk félre. Ha még kapható, itt megvásárolhatod.'
+    restore_refused: 'Ezt az előjegyzést nem állítottuk vissza: ugyanez a termék már elő van jegyezve.'
+    admin:
+        cancelled: 'Az előjegyzést visszavontuk.'

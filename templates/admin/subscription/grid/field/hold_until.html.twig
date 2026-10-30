@@ -1,0 +1,2 @@
+{# The hold deadline in the configured display timezone (as on the shop pages and in the mails). #}
+{% if data is not null %}{{ data|format_datetime('medium', 'short', timezone=webgriffe_bisn_timezone()) }}{% endif %}

@@ -19,9 +19,10 @@ final class WebgriffeSyliusBackInStockNotificationExtension extends AbstractReso
     /** @psalm-suppress UnusedVariable */
     public function load(array $configs, ContainerBuilder $container): void
     {
-        /** @var array{target: string} $config */
+        /** @var array{target: string, display_timezone: string|null} $config */
         $config = $this->processConfiguration($this->getConfiguration([], $container), $configs);
         $container->setParameter('webgriffe_sylius_back_in_stock_notification_plugin.target', $config['target']);
+        $container->setParameter('webgriffe_sylius_back_in_stock_notification_plugin.display_timezone', $config['display_timezone']);
         $loader = new YamlFileLoader($container, new FileLocator(__DIR__ . '/../../config'));
 
         $loader->load('services.yaml');

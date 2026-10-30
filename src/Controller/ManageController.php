@@ -10,6 +10,7 @@ use Sylius\Component\User\Canonicalizer\CanonicalizerInterface;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\Session\FlashBagAwareSessionInterface;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
@@ -17,6 +18,7 @@ use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Security\Csrf\CsrfToken;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 use Twig\Environment;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Customer\SubscriptionRestorer;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Manage\ManageLinkGenerator;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Manage\ManageLinkMailer;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Manage\ManageSession;
@@ -48,6 +50,7 @@ final class ManageController
         private ManageLinkMailer $linkMailer,
         private RateLimiterFactory $emailLimiterFactory,
         private RateLimiterFactory $ipLimiterFactory,
+        private SubscriptionRestorer $subscriptionRestorer,
     ) {
     }
 
@@ -139,9 +142,12 @@ final class ManageController
         $now = new \DateTimeImmutable();
         $email = $this->grantedEmailForPost($request, $now);
 
+        $refused = false;
         foreach ($this->subscriptionRepository->findCancelledByIds($this->cancelUndoSession->take($now), $email, $this->channelContext->getChannel()) as $subscription) {
-            $subscription->restore();
-            $this->subscriptionRepository->add($subscription);
+            $refused = !$this->subscriptionRestorer->restore($subscription) || $refused;
+        }
+        if ($refused) {
+            self::flashRestoreRefused($request);
         }
 
         return $this->redirectToManage($request);
@@ -210,5 +216,14 @@ final class ManageController
     private function render(string $template, array $parameters = [], int $status = Response::HTTP_OK): Response
     {
         return new Response($this->twig->render(self::TEMPLATE_PREFIX . $template . '.html.twig', $parameters), $status);
+    }
+
+    /** A restore kept cancelled because the same target is pre-ordered again: say so without any detail. */
+    private static function flashRestoreRefused(Request $request): void
+    {
+        $session = $request->hasSession() ? $request->getSession() : null;
+        if ($session instanceof FlashBagAwareSessionInterface) {
+            $session->getFlashBag()->add('info', SubscriptionRestorer::REFUSED_FLASH);
+        }
     }
 }

@@ -50,6 +50,16 @@ final class ProductInventoryContext implements Context
     }
 
     /**
+     * A logged-in customer sees the pre-ordered state of the product block instead of a flash message.
+     *
+     * @Then I should see that I have pre-ordered the product
+     */
+    public function iShouldSeeThatIHavePreorderedTheProduct(): void
+    {
+        Assert::true($this->subscriptionFormElement->isPreordered(), 'The product page does not show the pre-ordered state.');
+    }
+
+    /**
      * @Then an email with a success message should be sent to :email
      */
     public function anEmailWithASuccessMessageShouldBeSentTo(string $email): void

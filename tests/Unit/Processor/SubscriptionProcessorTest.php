@@ -304,6 +304,32 @@ final class SubscriptionProcessorTest extends TestCase
         self::assertSame([42], $this->guestSession->ids());
     }
 
+    public function testGuestDuplicateIsRememberedInSession(): void
+    {
+        $this->customerRepository->method('findOneBy')->willReturn(null);
+        $existing = new Subscription();
+        (new \ReflectionProperty(Subscription::class, 'id'))->setValue($existing, 17);
+        $this->targetResolver->method('findActive')->willReturn($existing);
+
+        $result = $this->processor->process($this->product, null, 'anna@pelda.hu', 'Anna', null);
+
+        // A reload then shows the same "pre-ordered" state as after a created pre-order.
+        self::assertSame(ProcessResult::AlreadySubscribed, $result);
+        self::assertSame([17], $this->guestSession->ids());
+    }
+
+    public function testLoggedInDuplicateIsNotRemembered(): void
+    {
+        $customer = $this->accountCustomer('anna@pelda.hu');
+        $existing = new Subscription();
+        (new \ReflectionProperty(Subscription::class, 'id'))->setValue($existing, 17);
+        $this->targetResolver->method('findActive')->willReturn($existing);
+
+        $this->processor->process($this->product, null, 'anna@pelda.hu', null, $customer);
+
+        self::assertSame([], $this->guestSession->ids());
+    }
+
     public function testLoggedInCreateIsNotRemembered(): void
     {
         $customer = $this->accountCustomer('anna@pelda.hu');

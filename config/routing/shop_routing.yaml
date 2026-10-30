@@ -38,11 +38,29 @@ webgriffe_back_in_stock_notification_account_list_subscriptions:
     path: /account/back-in-stock-notification
     methods: [ GET ]
     defaults:
-        _controller: webgriffe.controller.back_in_stock_notification_subscription::indexAction
-        _sylius:
-            section: shop_account
-            template: "@WebgriffeSyliusBackInStockNotificationPlugin/shop/account/subscription/index.html.twig"
-            grid: webgriffe_back_in_stock_notification_account_list_subscriptions
+        _controller: Webgriffe\SyliusBackInStockNotificationPlugin\Controller\AccountController::indexAction
+
+webgriffe_back_in_stock_notification_account_restore:
+    path: /account/back-in-stock-notification/restore
+    methods: [ POST ]
+    defaults:
+        _controller: Webgriffe\SyliusBackInStockNotificationPlugin\Controller\AccountController::restoreAction
+
+webgriffe_back_in_stock_notification_account_cancel:
+    path: /account/back-in-stock-notification/{id}/cancel
+    methods: [ POST ]
+    requirements:
+        id: '\d+'
+    defaults:
+        _controller: Webgriffe\SyliusBackInStockNotificationPlugin\Controller\AccountController::cancelAction
+
+webgriffe_back_in_stock_notification_account_dismiss:
+    path: /account/back-in-stock-notification/{id}/dismiss
+    methods: [ POST ]
+    requirements:
+        id: '\d+'
+    defaults:
+        _controller: Webgriffe\SyliusBackInStockNotificationPlugin\Controller\AccountController::dismissAction
 
 webgriffe_back_in_stock_notification_claim:
     path: /back-in-stock-notification/claim/{hash}

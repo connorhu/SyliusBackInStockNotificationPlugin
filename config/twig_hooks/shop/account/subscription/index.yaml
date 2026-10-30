@@ -12,8 +12,8 @@ sylius_twig_hooks:
                 priority: 0
 
         'webgriffe_sylius_back_in_stock_notification_plugin.shop.account.subscription.index.content.main':
-            grid:
-                template: '@SyliusShop/shared/grid.html.twig'
+            list:
+                template: '@WebgriffeSyliusBackInStockNotificationPlugin/shop/account/subscription/index/content/main/list.html.twig'
                 priority: 0
 
         'webgriffe_sylius_back_in_stock_notification_plugin.shop.account.subscription.index.content.main.header':

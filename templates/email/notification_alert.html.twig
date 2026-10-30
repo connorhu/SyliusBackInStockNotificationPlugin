@@ -18,7 +18,7 @@
 
     <div style="text-align: center; padding-bottom: 15px; font-size: 15px;">
         {% if holdUntil is defined and holdUntil is not null %}
-            {{ 'webgriffe_bisn.alert_email.held_until'|trans({'{until}': holdUntil|date('Y-m-d H:i')}, null, localeCode) }}
+            {{ 'webgriffe_bisn.alert_email.held_until'|trans({'{until}': holdUntil|format_datetime('medium', 'short', timezone=webgriffe_bisn_timezone(), locale=localeCode)}, null, localeCode) }}
         {% elseif mode is defined and mode == 'fastest' %}
             {{ 'webgriffe_bisn.alert_email.fastest'|trans({}, null, localeCode) }}
         {% endif %}

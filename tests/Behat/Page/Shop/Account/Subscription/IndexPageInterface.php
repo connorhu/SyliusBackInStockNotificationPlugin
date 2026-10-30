@@ -8,7 +8,9 @@ use FriendsOfBehat\PageObjectExtension\Page\SymfonyPageInterface;
 
 interface IndexPageInterface extends SymfonyPageInterface
 {
-    public function deleteFirstSubscription(): void;
+    public function cancelFirstSubscription(): void;
+
+    public function hasUndoBar(): bool;
 
     public function countSubscriptions(): int;
 

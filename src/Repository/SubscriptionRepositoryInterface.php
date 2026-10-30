@@ -122,4 +122,20 @@ interface SubscriptionRepositoryInterface extends RepositoryInterface
      * @return array{active: int, actionable: bool}
      */
     public function accountSummary(CustomerInterface $customer, ChannelInterface $channel): array;
+
+    /**
+     * The customer's own pre-orders in the channel for the account list: those of the customer or, without a customer, of
+     * their canonical e-mail address; cancelled and dismissed ones are left out. Newest first.
+     */
+    public function createForAccountQueryBuilder(CustomerInterface $customer, ChannelInterface $channel): QueryBuilder;
+
+    /**
+     * Queue positions (see queuePosition()) of the waiting pre-orders in the list, keyed by id, in a single query. Any
+     * other status, and a pre-order without an id, is left out.
+     *
+     * @param list<SubscriptionInterface> $subscriptions
+     *
+     * @return array<int, int>
+     */
+    public function queuePositions(array $subscriptions): array;
 }

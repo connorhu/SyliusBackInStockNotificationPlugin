@@ -1,3 +1,6 @@
 webgriffe_bisn:
     claim:
         expired: 'This link is no longer valid: the copy is not held any more. If it is still on sale, you can buy it here.'
+    restore_refused: 'This pre-order was not restored: the same item is already pre-ordered.'
+    admin:
+        cancelled: 'The pre-order has been cancelled.'
