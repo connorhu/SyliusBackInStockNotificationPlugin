@@ -25,8 +25,14 @@
     </div>
 
     <div style="text-align: center; padding-bottom: 30px; font-size: 15px;">
-        <a href="{{ url('sylius_shop_product_show', {'slug': translation.slug, '_locale': localeCode}) }}" style="display: inline-block; text-align: center; background: #1abb9c; padding: 18px 28px; color: #fff; text-decoration: none; text-transform: uppercase; border-radius: 3px;" target="_blank">
+        <a href="{{ claimUrl ?? url('sylius_shop_product_show', {'slug': translation.slug, '_locale': localeCode}) }}" style="display: inline-block; text-align: center; background: #1abb9c; padding: 18px 28px; color: #fff; text-decoration: none; text-transform: uppercase; border-radius: 3px;" target="_blank">
             {{ 'webgriffe_bisn.alert_email.alert_action'|trans({}, null, localeCode) }}
         </a>
     </div>
+
+    {% if holdUntil is defined and holdUntil is not null %}
+        <div style="text-align: center; padding-bottom: 30px; font-size: 13px; color: #666;">
+            {{ 'webgriffe_bisn.alert_email.claim_hint'|trans({}, null, localeCode) }}
+        </div>
+    {% endif %}
 {% endblock %}

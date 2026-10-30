@@ -96,3 +96,30 @@ The `down()` removes subscriptions without a variant, since the old schema canno
 - Active holds are counted per variant across **all channels** (stock is shared), so a unit held in one channel is not free in another.
 - Rows that do not match the configured target (a variant set under the `product` target, or no variant under the `variant` target, e.g.
   after switching the target) are skipped with the warning `webgriffe_bisn.restock.target_mismatch`; migrate or cancel them by hand.
+
+## Hold enforcement, claim links and fulfilment
+
+- `Webgriffe\SyliusBackInStockNotificationPlugin\Hold\HoldAwareAvailabilityChecker` **decorates `sylius.checker.inventory.availability`**.
+  In the shop section (Sylius `SectionProviderInterface`, `ShopSection` and its sub-sections) units under an active hold (`notified`,
+  `holdUntil > now`, counted per variant across all channels) are not available to a visitor who may not buy them:
+  `isStockSufficient($variant, $q)` = the decorated answer and `onHand - onHold - holds >= $q`. The holder and anyone whose pre-order of the
+  variant's target is already `notified` may buy held units. Admin, API, CLI and the restock run see the decorated checker's plain answer
+  (`SellableUnits` keeps its own undecorated instance). If you decorate the checker yourself, mind the decoration priority.
+- The visitor (`HoldVisitor`) is the logged-in customer (pre-orders with that customer, or without a customer and with its canonical e-mail)
+  plus the pre-orders claimed in this session (`ClaimSession`, key `webgriffe_bisn_claims`; reading never starts a session). Both services
+  memoise per request and are tagged `kernel.reset`.
+- New route `webgriffe_back_in_stock_notification_claim` (`GET /back-in-stock-notification/claim/{hash}`, shop routing): the signed link
+  (`ClaimLinkGenerator`, hash + `expires` = the end of the hold, `UriSigner`) marks the pre-order as claimed in the session and redirects to
+  the product page; an invalid or expired link redirects there with the info flash `webgriffe_bisn.claim.expired` (new `flashes` domain).
+- The `alert` mail gets the variable `claimUrl` (the claim link while a unit is held, the product page otherwise) and the key
+  `webgriffe_bisn.alert_email.claim_hint`; the buy button uses `claimUrl`. `RestockProcessor` takes the `ClaimLinkGenerator` as a new last
+  constructor argument.
+- `OrderCompletedListener` listens to **`sylius.order.post_complete`**: the active pre-orders of the order's customer (or, without a
+  customer, of its canonical e-mail) whose target contains an ordered variant become `fulfilled` (hold released). A failure is logged as
+  `webgriffe_bisn.order_fulfilment_failed` and never breaks the checkout. Orders completed through the API do not dispatch this event.
+- `PreorderStateResolver::resolve($product, $variant, $channel)` (`webgriffe.resolver.preorder_state`) returns a `PreorderView`
+  (`state`: `PreorderState` enum `NotPreorderable`, `CanPreorder`, `Preordered`, `HeldForYou`, `HeldForOthers`, `Sellable`; `subscription`,
+  `holdUntil`, `position`). A guest's own pre-orders of this session (`GuestPreorderSession`) resolve as `Preordered`.
+- `SubscriptionRepositoryInterface` gains `findActiveByVisitor()`, `queuePosition()` (1 + earlier waiting pre-orders of the same target and
+  channel, rule in `State\QueuePosition`), `activeHoldDeadlinesByProduct()` (latest active hold per product, one query) and
+  `accountSummary()` (active count and whether any is actionable).

@@ -37,6 +37,7 @@ webgriffe_bisn:
         alert_action: 'Buy now'
         held_until: 'We are holding a copy for you until {until}. After that it is offered to the next one in line.'
         fastest: 'Everyone waiting for it got this message: whoever orders first gets it.'
+        claim_hint: 'The button is personal: open it in the browser you will buy with, and the held copy can be put in the cart there.'
     hold_expired_mail:
         title: 'Your hold has ended'
         message: 'The copy of {product} we were holding for you is no longer held, so it can go to the next one in line.'

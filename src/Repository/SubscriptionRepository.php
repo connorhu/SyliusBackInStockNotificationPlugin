@@ -10,8 +10,10 @@ use Sylius\Component\Channel\Model\ChannelInterface;
 use Sylius\Component\Core\Model\ProductInterface;
 use Sylius\Component\Core\Model\ProductVariantInterface;
 use Sylius\Component\Customer\Model\CustomerInterface;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\PreorderChannelSettingsInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionStatus;
+use Webgriffe\SyliusBackInStockNotificationPlugin\State\QueuePosition;
 
 final class SubscriptionRepository extends EntityRepository implements SubscriptionRepositoryInterface
 {
@@ -192,6 +194,123 @@ final class SubscriptionRepository extends EntityRepository implements Subscript
         }
 
         return $counts;
+    }
+
+    public function findActiveByVisitor(?CustomerInterface $customer, ?string $emailCanonical, array $ids): array
+    {
+        $conditions = [];
+        $queryBuilder = $this
+            ->createQueryBuilder('subscription')
+            ->andWhere('subscription.status IN (:statuses)')
+            ->setParameter('statuses', SubscriptionStatus::ACTIVE)
+            ->addOrderBy('subscription.createdAt', 'ASC')
+            ->addOrderBy('subscription.id', 'ASC')
+        ;
+        if (null !== $customer) {
+            $conditions[] = 'subscription.customer = :customer';
+            $queryBuilder->setParameter('customer', $customer);
+        }
+        if (null !== $emailCanonical && '' !== $emailCanonical) {
+            $conditions[] = '(subscription.customer IS NULL AND subscription.emailCanonical = :emailCanonical)';
+            $queryBuilder->setParameter('emailCanonical', $emailCanonical);
+        }
+        if ([] !== $ids) {
+            $conditions[] = 'subscription.id IN (:ids)';
+            $queryBuilder->setParameter('ids', $ids);
+        }
+        if ([] === $conditions) {
+            return [];
+        }
+
+        /** @var list<SubscriptionInterface> $result */
+        $result = $queryBuilder->andWhere(implode(' OR ', $conditions))->getQuery()->getResult();
+
+        return $result;
+    }
+
+    public function queuePosition(SubscriptionInterface $subscription): ?int
+    {
+        $product = $subscription->getProduct();
+        $channel = $subscription->getChannel();
+        if (SubscriptionStatus::WAITING !== $subscription->getStatus() || null === $product || null === $channel) {
+            return null;
+        }
+
+        return QueuePosition::among($subscription, $this->findActiveByTarget($product, $subscription->getProductVariant(), $channel));
+    }
+
+    public function activeHoldDeadlinesByProduct(array $productIds, ChannelInterface $channel): array
+    {
+        if ([] === $productIds) {
+            return [];
+        }
+
+        /** @var list<array{productId: int|string, holdUntil: \DateTimeInterface|string|null}> $rows */
+        $rows = $this
+            ->createQueryBuilder('subscription')
+            ->select('IDENTITY(subscription.product) AS productId', 'MAX(subscription.holdUntil) AS holdUntil')
+            ->andWhere('subscription.product IN (:productIds)')
+            ->andWhere('subscription.channel = :channel')
+            ->andWhere('subscription.status = :notified')
+            ->andWhere('subscription.heldVariant IS NOT NULL')
+            ->andWhere('subscription.holdUntil > :now')
+            ->setParameter('productIds', $productIds)
+            ->setParameter('channel', $channel)
+            ->setParameter('notified', SubscriptionStatus::NOTIFIED)
+            ->setParameter('now', new \DateTimeImmutable())
+            ->groupBy('subscription.product')
+            ->getQuery()
+            ->getArrayResult()
+        ;
+
+        $deadlines = [];
+        foreach ($rows as $row) {
+            $holdUntil = $row['holdUntil'];
+            if (null === $holdUntil) {
+                continue;
+            }
+            $deadlines[(int) $row['productId']] = $holdUntil instanceof \DateTimeInterface
+                ? \DateTimeImmutable::createFromInterface($holdUntil)
+                : new \DateTimeImmutable($holdUntil);
+        }
+
+        return $deadlines;
+    }
+
+    public function accountSummary(CustomerInterface $customer, ChannelInterface $channel): array
+    {
+        $fastest = $channel instanceof PreorderChannelSettingsInterface && PreorderChannelSettingsInterface::MODE_FASTEST === $channel->getPreorderMode();
+        $actionable = $fastest
+            ? 'subscription.status = :notified'
+            : 'subscription.status = :notified AND subscription.heldVariant IS NOT NULL AND subscription.holdUntil > :now';
+
+        $queryBuilder = $this
+            ->createQueryBuilder('subscription')
+            ->select('COUNT(subscription.id) AS active', sprintf('SUM(CASE WHEN %s THEN 1 ELSE 0 END) AS actionable', $actionable))
+            ->andWhere('subscription.channel = :channel')
+            ->andWhere('subscription.status IN (:statuses)')
+            ->setParameter('channel', $channel)
+            ->setParameter('statuses', SubscriptionStatus::ACTIVE)
+            ->setParameter('notified', SubscriptionStatus::NOTIFIED)
+        ;
+        if (!$fastest) {
+            $queryBuilder->setParameter('now', new \DateTimeImmutable());
+        }
+        $emailCanonical = $customer->getEmailCanonical();
+        if (null === $emailCanonical || '' === $emailCanonical) {
+            $queryBuilder->andWhere('subscription.customer = :customer');
+        } else {
+            $queryBuilder
+                ->andWhere('subscription.customer = :customer OR (subscription.customer IS NULL AND subscription.emailCanonical = :emailCanonical)')
+                ->setParameter('emailCanonical', $emailCanonical)
+            ;
+        }
+        $queryBuilder->setParameter('customer', $customer);
+
+        /** @var array{active: int|string|null, actionable: int|string|null} $row */
+        $row = $queryBuilder->getQuery()->getSingleResult();
+
+        return ['active' => (int) $row['active'], 'actionable' => (int) $row['actionable'] > 0];
     }
 
     private function createEmailQueryBuilder(string $emailCanonical, ChannelInterface $channel): QueryBuilder
