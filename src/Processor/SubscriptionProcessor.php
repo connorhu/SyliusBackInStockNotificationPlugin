@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Webgriffe\SyliusBackInStockNotificationPlugin\Processor;
 
 use Sylius\Component\Channel\Context\ChannelContextInterface;
+use Sylius\Component\Core\Model\ProductInterface;
 use Sylius\Component\Core\Model\ProductVariantInterface;
 use Sylius\Component\Customer\Model\CustomerInterface;
 use Sylius\Component\Locale\Context\LocaleContextInterface;
@@ -12,6 +13,7 @@ use Sylius\Component\Mailer\Sender\SenderInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Factory\SubscriptionFactoryInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Repository\SubscriptionRepositoryInterface;
+use Webmozart\Assert\Assert;
 
 final class SubscriptionProcessor implements SubscriptionProcessorInterface
 {
@@ -31,11 +33,15 @@ final class SubscriptionProcessor implements SubscriptionProcessorInterface
     ): SubscriptionInterface {
         $channel = $this->channelContext->getChannel();
         $localeCode = $this->localeContext->getLocaleCode();
+        $product = $productVariant->getProduct();
+        Assert::isInstanceOf($product, ProductInterface::class);
 
         $subscription = $this->subscriptionFactory->createWithData(
             $channel,
+            $product,
             $productVariant,
             $email,
+            null,
             $localeCode,
             $customer,
         );

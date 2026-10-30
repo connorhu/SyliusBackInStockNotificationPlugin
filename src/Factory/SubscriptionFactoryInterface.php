@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Webgriffe\SyliusBackInStockNotificationPlugin\Factory;
 
 use Sylius\Component\Channel\Model\ChannelInterface;
+use Sylius\Component\Core\Model\ProductInterface;
 use Sylius\Component\Core\Model\ProductVariantInterface;
 use Sylius\Component\Customer\Model\CustomerInterface;
 use Sylius\Resource\Factory\FactoryInterface;
@@ -17,9 +18,11 @@ interface SubscriptionFactoryInterface extends FactoryInterface
 {
     public function createWithData(
         ChannelInterface $channel,
-        ProductVariantInterface $productVariant,
+        ProductInterface $product,
+        ?ProductVariantInterface $productVariant,
         string $email,
+        ?string $name,
         string $localeCode,
-        ?CustomerInterface $customer,
+        ?CustomerInterface $customer = null,
     ): SubscriptionInterface;
 }

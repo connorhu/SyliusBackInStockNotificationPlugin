@@ -8,10 +8,12 @@ use Sylius\Component\Core\Model\CustomerInterface;
 use Sylius\Component\Core\Model\ProductVariantInterface;
 use Sylius\Component\Core\Repository\ProductVariantRepositoryInterface;
 use Sylius\Component\Customer\Context\CustomerContextInterface;
+use Sylius\Component\User\Canonicalizer\CanonicalizerInterface;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
 use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 use Symfony\Component\Validator\Exception\UnexpectedValueException;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionStatus;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Repository\SubscriptionRepositoryInterface;
 
 /**
@@ -23,6 +25,7 @@ final class SubscriptionUniqueValidator extends ConstraintValidator
         private SubscriptionRepositoryInterface $subscriptionRepository,
         private ProductVariantRepositoryInterface $productVariantRepository,
         private CustomerContextInterface $customerContext,
+        private CanonicalizerInterface $canonicalizer,
     ) {
     }
 
@@ -62,9 +65,9 @@ final class SubscriptionUniqueValidator extends ConstraintValidator
         }
 
         if ([] !== $this->subscriptionRepository->findBy([
-            'email' => $email,
+            'emailCanonical' => $this->canonicalizer->canonicalize(trim($email)),
             'productVariant' => $productVariant,
-            'notify' => false,
+            'status' => SubscriptionStatus::ACTIVE,
         ])) {
             $this->context
                 ->buildViolation($constraint->message)

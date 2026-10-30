@@ -19,7 +19,9 @@ final class WebgriffeSyliusBackInStockNotificationExtension extends AbstractReso
     /** @psalm-suppress UnusedVariable */
     public function load(array $configs, ContainerBuilder $container): void
     {
-        $this->processConfiguration($this->getConfiguration([], $container), $configs);
+        /** @var array{target: string} $config */
+        $config = $this->processConfiguration($this->getConfiguration([], $container), $configs);
+        $container->setParameter('webgriffe_sylius_back_in_stock_notification_plugin.target', $config['target']);
         $loader = new YamlFileLoader($container, new FileLocator(__DIR__ . '/../../config'));
 
         $loader->load('services.yaml');

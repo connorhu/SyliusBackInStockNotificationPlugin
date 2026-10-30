@@ -9,11 +9,20 @@ use Symfony\Component\Config\Definition\ConfigurationInterface;
 
 final class Configuration implements ConfigurationInterface
 {
-    /** @psalm-suppress UnusedVariable */
+    /** @psalm-suppress UnusedVariable, UnusedMethodCall */
     public function getConfigTreeBuilder(): TreeBuilder
     {
         $treeBuilder = new TreeBuilder('webgriffe_sylius_back_in_stock_notification_plugin');
         $rootNode = $treeBuilder->getRootNode();
+        $rootNode
+            ->children()
+                ->enumNode('target')
+                    ->values(['product', 'variant'])
+                    ->defaultValue('variant')
+                    ->info('What a subscription waits for: any variant of a product, or one specific variant.')
+                ->end()
+            ->end()
+        ;
 
         return $treeBuilder;
     }
