@@ -99,6 +99,7 @@
     },
     "autoload-dev": {
         "psr-4": {
+            "Webgriffe\\SyliusBackInStockNotificationPlugin\\Migrations\\": "migrations/",
             "Tests\\Webgriffe\\SyliusBackInStockNotificationPlugin\\": "tests/",
             "Tests\\Webgriffe\\SyliusBackInStockNotificationPlugin\\TestApplication\\": "tests/TestApplication/src"
         }
