@@ -1,3 +1,5 @@
 webgriffe_bisn:
     subscription:
         already_saved: 'Subscription with the mail email is already present'
+        not_preorderable: 'This product cannot be pre-ordered.'
+        rate_limited: 'You can pre-order again in a few minutes.'

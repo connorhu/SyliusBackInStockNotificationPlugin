@@ -13,7 +13,6 @@
 - `SubscriptionInterface` gains `getProduct()` / `setProduct()`, `getName()` / `setName()`, `getEmailCanonical()` and the
   lifecycle/hold getters. `getProductVariant()` is now nullable in the database as well (product target).
 - Grid fields/filters named `notify` are now `status`; the templates `.../grid/field/notify.html.twig` are renamed to `status.html.twig`.
-- `SubscriptionUniqueValidator` takes the canonicalizer as 4th constructor argument and only counts active subscriptions.
 
 ## Target
 
@@ -38,3 +37,38 @@ The `down()` removes subscriptions without a variant, since the old schema canno
   (the traits do it), otherwise `doctrine:schema:validate` reports them as unmapped.
 - `AddNotificationComponent` takes two more constructor arguments (the `PreorderabilityResolverInterface` and the channel context);
   the block renders nothing when the product is not pre-orderable in the current channel.
+
+## Guest pre-orders and the processor (BC break)
+
+- `SubscriptionProcessorInterface::process()` is now
+  `process(ProductInterface $product, ?ProductVariantInterface $variant, string $email, ?string $name, ?CustomerInterface $customer, ?string $clientIp = null): ProcessResult`.
+  `ProcessResult` is an enum: `Created`, `AlreadySubscribed`, `NotPreorderable`, `RateLimited`. The processor refuses products that are
+  not pre-orderable in the current channel, treats e-mail addresses case-insensitively, and attaches the pre-order to the customer when the
+  address belongs to a registered account (a customer with a shop user). A logged-in customer's own e-mail wins over the typed one.
+  `SubscriptionProcessor` takes new constructor arguments (SafeSender, target resolver, pre-orderability resolver, `AccountCustomerFinder`,
+  `GuestPreorderSession`, router, canonicalizer, logger); if you redefined the service, copy the new arguments from `config/services.yaml`.
+- The confirmation e-mail (`webgriffe_back_in_stock_notification_success_subscription`) gets the variables `subscription`, `product`, `mode`,
+  `holdHours`, `manageUrl` and `accountUrl`; the translation key `subscription_unsub` is replaced by `not_you`. Mails go through `SafeSender`,
+  which logs `webgriffe_bisn.mail_failed` instead of throwing.
+- `SubscriptionType` gains the `name` field and an unmapped honeypot `website`; the `ask_identity` option (default `true`) turns the `name` and
+  `email` fields off for a logged-in customer. `AddNotificationComponent` takes the request stack as last constructor argument.
+- The `SubscriptionUnique` constraint, its validator and the service are removed: a form error for an already pre-ordered address would
+  reveal who has pre-ordered. Duplicates are detected in the processor (`ProcessResult::AlreadySubscribed`); a guest sees the same success
+  state as for a new pre-order (nothing stored, no second mail), a logged-in customer sees the `webgriffe_bisn.subscription.already_saved` error.
+- `GuestPreorderSession` remembers the ids of the pre-orders a guest created (session key `webgriffe_bisn_guest_preorders`).
+
+## Manage page replaces the GET delete (BC break)
+
+- The route `webgriffe_back_in_stock_notification_delete_subscription` (GET delete by hash), `SubscriptionController` and the account grid's
+  `delete` field with its template are removed: a state-changing GET link in a mail can be triggered by anyone holding it. Guests manage their
+  pre-orders on `webgriffe_back_in_stock_notification_manage`, opened from a signed link (e-mail + `expires`, valid 24 hours, no token table);
+  deleting is a CSRF-protected POST that cancels softly (`markCancelled`) and can be undone for 10 minutes (`CancelUndoSession`).
+- New routes: `..._manage`, `..._manage_request`, `..._manage_link_sent`, `..._manage_delete`, `..._manage_delete_all`, `..._manage_restore`;
+  new mail code `webgriffe_back_in_stock_notification_manage_link`.
+- `symfony/rate-limiter` is now required. The bundle prepends the limiters `webgriffe_bisn_manage_link_email` (1 per 60 s) and
+  `webgriffe_bisn_manage_link_ip` (10 per hour) to `framework.rate_limiter`.
+- `SubscriptionProcessor` takes the `ManageLinkGenerator` as a new constructor argument (after the router); the confirmation mail's
+  `manageUrl` is now filled for guest pre-orders.
+- `SubscriptionRepositoryInterface` gains `findManageableByEmail()`, `findActiveByEmail()`, `findOneByHashAndEmail()` and `findCancelledByIds()`.
+- The "new link" mail is sent on `kernel.terminate` by `ManageLinkMailer` (lookup included), so the request's timing does not reveal whether an
+  address has pre-orders. `findOneByHashAndEmail()` and `findCancelledByIds()` take the channel as an extra argument.

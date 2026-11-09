@@ -1,0 +1,48 @@
+{% extends '@WebgriffeSyliusBackInStockNotificationPlugin/shop/manage/_layout.html.twig' %}
+
+{% block manage_content %}
+    <h1 class="h3 mb-1">{{ 'webgriffe_bisn.manage.title'|trans }}</h1>
+    <p class="text-muted">{{ 'webgriffe_bisn.manage.intro'|trans({'{email}': email}) }}</p>
+
+    {% if undoCount > 0 %}
+        <div class="alert alert-info d-flex justify-content-between align-items-center" role="status">
+            <span>{{ 'webgriffe_bisn.manage.deleted'|trans({'{count}': undoCount}) }}</span>
+            <form method="post" action="{{ path('webgriffe_back_in_stock_notification_manage_restore') }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('webgriffe_bisn_manage') }}">
+                <button type="submit" class="btn btn-sm btn-outline-primary">{{ 'webgriffe_bisn.manage.undo'|trans }}</button>
+            </form>
+        </div>
+    {% endif %}
+
+    {% if subscriptions is empty %}
+        <p>{{ 'webgriffe_bisn.manage.empty'|trans }}</p>
+    {% else %}
+        <ul class="list-group mb-3">
+            {% for subscription in subscriptions %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="fw-bold">{{ subscription.product.name }}</div>
+                        {% if subscription.productVariant %}
+                            <div class="small text-muted">{{ subscription.productVariant.name ?: subscription.productVariant.code }}</div>
+                        {% endif %}
+                        <div class="small text-muted">
+                            {{ ('webgriffe_bisn.status.' ~ subscription.status)|trans }}
+                            &middot; {{ subscription.createdAt|date('Y-m-d') }}
+                        </div>
+                    </div>
+                    {% if subscription.active %}
+                        <form method="post" action="{{ path('webgriffe_back_in_stock_notification_manage_delete', {'hash': subscription.hash}) }}">
+                            <input type="hidden" name="_token" value="{{ csrf_token('webgriffe_bisn_manage') }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">{{ 'webgriffe_bisn.manage.delete'|trans }}</button>
+                        </form>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+
+        <form method="post" action="{{ path('webgriffe_back_in_stock_notification_manage_delete_all') }}">
+            <input type="hidden" name="_token" value="{{ csrf_token('webgriffe_bisn_manage') }}">
+            <button type="submit" class="btn btn-outline-danger">{{ 'webgriffe_bisn.manage.delete_all'|trans }}</button>
+        </form>
+    {% endif %}
+{% endblock %}

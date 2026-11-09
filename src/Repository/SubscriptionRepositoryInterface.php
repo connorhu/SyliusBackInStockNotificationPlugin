@@ -32,4 +32,27 @@ interface SubscriptionRepositoryInterface extends RepositoryInterface
      * The active subscription of an e-mail address (canonical form) for a target, if any.
      */
     public function findActiveOne(string $emailCanonical, ProductInterface $product, ?ProductVariantInterface $variant, ChannelInterface $channel): ?SubscriptionInterface;
+
+    /**
+     * Pre-orders of an e-mail address (canonical form) on a channel that are neither cancelled nor dismissed, oldest first.
+     *
+     * @return list<SubscriptionInterface>
+     */
+    public function findManageableByEmail(string $emailCanonical, ChannelInterface $channel): array;
+
+    /**
+     * Active (waiting or notified) pre-orders of an e-mail address (canonical form) on a channel, oldest first.
+     *
+     * @return list<SubscriptionInterface>
+     */
+    public function findActiveByEmail(string $emailCanonical, ChannelInterface $channel): array;
+
+    public function findOneByHashAndEmail(string $hash, string $emailCanonical, ChannelInterface $channel): ?SubscriptionInterface;
+
+    /**
+     * @param list<int> $ids
+     *
+     * @return list<SubscriptionInterface>
+     */
+    public function findCancelledByIds(array $ids, string $emailCanonical, ChannelInterface $channel): array;
 }

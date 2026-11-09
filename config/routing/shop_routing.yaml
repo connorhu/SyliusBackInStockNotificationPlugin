@@ -1,8 +1,38 @@
-webgriffe_back_in_stock_notification_delete_subscription:
-    path: /back-in-stock-notification/delete-subscription/{hash}
+webgriffe_back_in_stock_notification_manage:
+    path: /back-in-stock-notification/manage
     methods: [ GET ]
     defaults:
-        _controller: Webgriffe\SyliusBackInStockNotificationPlugin\Controller\SubscriptionController::deleteAction
+        _controller: Webgriffe\SyliusBackInStockNotificationPlugin\Controller\ManageController::manageAction
+
+webgriffe_back_in_stock_notification_manage_request:
+    path: /back-in-stock-notification/manage/new-link
+    methods: [ GET, POST ]
+    defaults:
+        _controller: Webgriffe\SyliusBackInStockNotificationPlugin\Controller\ManageController::requestAction
+
+webgriffe_back_in_stock_notification_manage_link_sent:
+    path: /back-in-stock-notification/manage/link-sent
+    methods: [ GET ]
+    defaults:
+        _controller: Webgriffe\SyliusBackInStockNotificationPlugin\Controller\ManageController::linkSentAction
+
+webgriffe_back_in_stock_notification_manage_delete_all:
+    path: /back-in-stock-notification/manage/delete-all
+    methods: [ POST ]
+    defaults:
+        _controller: Webgriffe\SyliusBackInStockNotificationPlugin\Controller\ManageController::deleteAllAction
+
+webgriffe_back_in_stock_notification_manage_restore:
+    path: /back-in-stock-notification/manage/restore
+    methods: [ POST ]
+    defaults:
+        _controller: Webgriffe\SyliusBackInStockNotificationPlugin\Controller\ManageController::restoreAction
+
+webgriffe_back_in_stock_notification_manage_delete:
+    path: /back-in-stock-notification/manage/{hash}/delete
+    methods: [ POST ]
+    defaults:
+        _controller: Webgriffe\SyliusBackInStockNotificationPlugin\Controller\ManageController::deleteAction
 
 webgriffe_back_in_stock_notification_account_list_subscriptions:
     path: /account/back-in-stock-notification
