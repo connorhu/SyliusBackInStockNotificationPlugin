@@ -21,8 +21,14 @@ jobs:
                 php: [ "8.2", "8.3" ]
                 symfony: [ "^6.4", "^7.3" ]
                 sylius: [ "^2.0", "^2.1" ]
-                node: [ "20.x" ]
+                node: [ "22.x" ]
                 mysql: [ "8.0" ]
+                include:
+                    -   php: "8.3"
+                        symfony: "^7.3"
+                        sylius: "^2.3"
+                        node: "22.x"
+                        mysql: "8.0"
         env:
             APP_ENV: test
             DATABASE_URL: "mysql://root:root@127.0.0.1/sylius?serverVersion=${{ matrix.mysql }}"
@@ -132,7 +138,17 @@ jobs:
                 run: composer-unused
 
             -   name: Validate database schema
-                run: vendor/bin/console doctrine:schema:validate
+                # Mapping always; database sync only for what the plugin's migrations own. Sylius' own migrations
+                # drift from its mapping on some versions (2.3 omits the track_usage_since type comment; under DBAL 4
+                # the older ones leave "(DC2Type:...)" comments), which is not this plugin's to fix.
+                run: |
+                    vendor/bin/console doctrine:schema:validate --skip-sync
+                    sql="$(vendor/bin/console doctrine:schema:update --dump-sql)"
+                    echo "$sql"
+                    if echo "$sql" | grep -Ei 'webgriffe_back_in_stock|preorder'; then
+                        echo "The plugin's tables or columns are out of sync with the mapping."
+                        exit 1
+                    fi
 
             -   name: Run PHPStan
                 run: vendor/bin/phpstan analyse
@@ -171,7 +187,7 @@ jobs:
                 php: [ "8.3" ]
                 symfony: [ "^7.3" ]
                 sylius: [ "^2.1" ]
-                node: [ "20.x" ]
+                node: [ "22.x" ]
                 postgresql: [ "17" ]
         env:
             APP_ENV: test
@@ -235,7 +251,17 @@ jobs:
                     vendor/bin/console doctrine:migrations:migrate --no-interaction -vvv
 
             -   name: Validate database schema
-                run: vendor/bin/console doctrine:schema:validate
+                # Mapping always; database sync only for what the plugin's migrations own. Sylius' own migrations
+                # drift from its mapping on some versions (2.3 omits the track_usage_since type comment; under DBAL 4
+                # the older ones leave "(DC2Type:...)" comments), which is not this plugin's to fix.
+                run: |
+                    vendor/bin/console doctrine:schema:validate --skip-sync
+                    sql="$(vendor/bin/console doctrine:schema:update --dump-sql)"
+                    echo "$sql"
+                    if echo "$sql" | grep -Ei 'webgriffe_back_in_stock|preorder'; then
+                        echo "The plugin's tables or columns are out of sync with the mapping."
+                        exit 1
+                    fi
 
     roave_bc_check:
         name: Roave BC Check
