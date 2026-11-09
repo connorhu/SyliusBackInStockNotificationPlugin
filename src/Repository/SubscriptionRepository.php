@@ -141,6 +141,59 @@ final class SubscriptionRepository extends EntityRepository implements Subscript
         return $result;
     }
 
+    public function findRestockTargets(): array
+    {
+        $representatives = $this
+            ->createQueryBuilder('target')
+            ->select('MIN(target.id)')
+            ->andWhere('target.status IN (:statuses)')
+            ->groupBy('target.channel')
+            ->addGroupBy('target.product')
+            ->addGroupBy('target.productVariant')
+        ;
+
+        /** @var list<SubscriptionInterface> $result */
+        $result = $this
+            ->createQueryBuilder('subscription')
+            ->andWhere(sprintf('subscription.id IN (%s)', $representatives->getDQL()))
+            ->setParameter('statuses', SubscriptionStatus::ACTIVE)
+            ->addOrderBy('subscription.id', 'ASC')
+            ->getQuery()
+            ->getResult()
+        ;
+
+        return $result;
+    }
+
+    public function countActiveHoldsByVariant(array $variants, \DateTimeImmutable $now): array
+    {
+        if ([] === $variants) {
+            return [];
+        }
+
+        /** @var list<array{variantId: int|string, holds: int|string}> $rows */
+        $rows = $this
+            ->createQueryBuilder('subscription')
+            ->select('IDENTITY(subscription.heldVariant) AS variantId', 'COUNT(subscription.id) AS holds')
+            ->andWhere('subscription.heldVariant IN (:variants)')
+            ->andWhere('subscription.status = :notified')
+            ->andWhere('subscription.holdUntil > :now')
+            ->setParameter('variants', $variants)
+            ->setParameter('notified', SubscriptionStatus::NOTIFIED)
+            ->setParameter('now', $now)
+            ->groupBy('subscription.heldVariant')
+            ->getQuery()
+            ->getArrayResult()
+        ;
+
+        $counts = [];
+        foreach ($rows as $row) {
+            $counts[(int) $row['variantId']] = (int) $row['holds'];
+        }
+
+        return $counts;
+    }
+
     private function createEmailQueryBuilder(string $emailCanonical, ChannelInterface $channel): QueryBuilder
     {
         return $this

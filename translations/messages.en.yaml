@@ -35,6 +35,14 @@ webgriffe_bisn:
         alert_title: 'Product available again'
         alert_message: 'We inform you that the product {product} is back in stock'
         alert_action: 'Buy now'
+        held_until: 'We are holding a copy for you until {until}. After that it is offered to the next one in line.'
+        fastest: 'Everyone waiting for it got this message: whoever orders first gets it.'
+    hold_expired_mail:
+        title: 'Your hold has ended'
+        message: 'The copy of {product} we were holding for you is no longer held, so it can go to the next one in line.'
+        still_available: 'It can still be bought right now: whoever orders first gets it.'
+        buy_action: 'Buy now'
+        not_available: 'It is no longer available. Your pre-order stays on the list and we will write to you when a copy arrives again.'
     manage:
         title: 'Your pre-orders'
         intro: 'Pre-orders for {email}'

@@ -4,33 +4,24 @@ declare(strict_types=1);
 
 namespace Webgriffe\SyliusBackInStockNotificationPlugin\Command;
 
-use Psr\Log\LoggerInterface;
-use Sylius\Component\Channel\Model\ChannelInterface;
-use Sylius\Component\Core\Model\ProductVariantInterface;
-use Sylius\Component\Inventory\Checker\AvailabilityCheckerInterface;
-use Sylius\Component\Mailer\Sender\SenderInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Command\LockableTrait;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Routing\RouterInterface;
-use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionInterface;
-use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionStatus;
-use Webgriffe\SyliusBackInStockNotificationPlugin\Repository\SubscriptionRepositoryInterface;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Restock\RestockProcessor;
 
 #[AsCommand(
     name: 'webgriffe:back-in-stock-notification:alert',
-    description: 'Send an email to the user if the product is returned in stock',
+    description: 'Notify pre-orders of restocked products, pass on expired holds and move sold-out ones back to waiting',
 )]
 final class AlertCommand extends Command
 {
+    use LockableTrait;
+
     public function __construct(
-        private LoggerInterface $logger,
-        private SenderInterface $sender,
-        private AvailabilityCheckerInterface $availabilityChecker,
-        private SubscriptionRepositoryInterface $backInStockNotificationRepository,
-        private RouterInterface $router,
-        string $name = null,
+        private RestockProcessor $restockProcessor,
+        ?string $name = null,
     ) {
         parent::__construct($name);
     }
@@ -38,59 +29,35 @@ final class AlertCommand extends Command
     protected function configure(): void
     {
         $this
-            ->setHelp('Check the stock status of the products in the webgriffe_back_in_stock_notification table and send and email to the user if the product is returned in stock')
+            ->setHelp('Run it from cron every 5 minutes. For every product (or variant) with active pre-orders it expires lapsed holds, moves notified pre-orders of a sold-out target back to waiting and notifies waiting ones while there are free units, by the channel\'s restock mode (fastest or queue). Overlapping runs exit at once.')
         ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        //I think that this load in the long time can be a bottle necklace
-        $subscriptions = $this->backInStockNotificationRepository->findBy(['status' => SubscriptionStatus::WAITING]);
-        foreach ($subscriptions as $subscription) {
-            $channel = $subscription->getChannel();
-            $productVariant = $subscription->getProductVariant();
-            if ($productVariant === null || $channel === null) {
-                $this->backInStockNotificationRepository->remove($subscription);
-                $this->logger->warning(
-                    'The back in stock subscription for the product does not have all the information required',
-                    ['subscription' => var_export($subscription, true)],
-                );
+        if (!$this->lock()) {
+            $output->writeln('The command is already running in another process.');
 
-                continue;
-            }
-
-            if (
-                $this->availabilityChecker->isStockAvailable($productVariant) &&
-                $productVariant->isEnabled() &&
-                $productVariant->getProduct()?->isEnabled() === true
-            ) {
-                $this->router->getContext()->setHost($channel->getHostname() ?? 'localhost');
-                $this->sendEmail($subscription, $productVariant, $channel);
-                $subscription->markNotified(new \DateTimeImmutable(), null, null);
-                $this->backInStockNotificationRepository->add($subscription);
-            }
+            return Command::SUCCESS;
         }
 
-        return 0;
-    }
+        try {
+            $report = $this->restockProcessor->process(new \DateTimeImmutable());
+        } finally {
+            $this->release();
+        }
 
-    private function sendEmail(
-        SubscriptionInterface $subscription,
-        ProductVariantInterface $productVariant,
-        ChannelInterface $channel,
-    ): void {
-        /** @psalm-suppress DeprecatedMethod */
-        $this->sender->send(
-            'webgriffe_back_in_stock_notification_alert',
-            [$subscription->getEmail()],
-            [
-                'subscription' => $subscription,
-                'product' => $productVariant->getProduct(),
-                'channel' => $channel,
-                'localeCode' => $subscription->getLocaleCode(),
-            ],
-            [],
-            [],
-        );
+        $output->writeln(sprintf('Notified: %d (with a hold: %d)', $report->getNotified(), $report->getHeld()));
+        $output->writeln(sprintf('Expired holds: %d', $report->getExpired()));
+        $output->writeln(sprintf('Back to waiting: %d', $report->getRewaited()));
+        $output->writeln(sprintf('Failed targets: %d', $report->getFailedTargets()));
+
+        if ($report->isAborted()) {
+            $output->writeln('<error>Saving failed, the run stopped early (see the log).</error>');
+
+            return Command::FAILURE;
+        }
+
+        return Command::SUCCESS;
     }
 }

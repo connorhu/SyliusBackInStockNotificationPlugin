@@ -13,6 +13,18 @@ webgriffe_bisn:
         manage_action: 'Előjegyzéseim kezelése'
         account_action: 'Fiókom megnyitása'
         not_you: 'Ha nem te voltál, <a href="{url}" target="_blank">itt törölheted</a>.'
+    alert_email:
+        alert_title: 'Újra kapható'
+        alert_message: 'Megérkezett, amire vártál: a(z) {product} újra megvásárolható.'
+        alert_action: 'Megveszem'
+        held_until: 'Egy példányt {until}-ig félreteszünk neked. Utána a sorban következő kapja meg.'
+        fastest: 'Minden várakozó megkapta ezt a levelet: aki előbb rendel, azé.'
+    hold_expired_mail:
+        title: 'Lejárt a félretétel'
+        message: 'A(z) {product} neked félretett példányát már nem tartjuk, így a sorban következő kaphatja meg.'
+        still_available: 'Most még megvásárolható: aki előbb rendel, azé.'
+        buy_action: 'Megveszem'
+        not_available: 'Már nem kapható. Az előjegyzésed megmarad, és írunk, ha újra érkezik példány.'
     manage:
         title: 'Az előjegyzéseid'
         intro: '{email} előjegyzései'
