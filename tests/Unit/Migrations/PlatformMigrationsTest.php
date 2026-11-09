@@ -14,6 +14,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Migrations\Version20210419151725;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Migrations\Version20220523152238;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Migrations\Version20261030100000;
 
 final class PlatformMigrationsTest extends TestCase
 {
@@ -67,6 +68,50 @@ final class PlatformMigrationsTest extends TestCase
         self::assertStringNotContainsString('BOOLEAN', $sql);
     }
 
+    public function testLifecycleMigrationEmitsPostgresqlSqlOnPostgres(): void
+    {
+        $sql = $this->upSql(Version20261030100000::class, new PostgreSQLPlatform());
+
+        self::assertStringContainsString('ADD notified_at TIMESTAMP(0) WITHOUT TIME ZONE DEFAULT NULL', $sql);
+        self::assertStringContainsString('ALTER COLUMN product_id SET NOT NULL', $sql);
+        self::assertStringContainsString('ALTER COLUMN product_variant_id DROP NOT NULL', $sql);
+        self::assertStringContainsString('FK_1F046E384584665A FOREIGN KEY (product_id) REFERENCES sylius_product (id) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE', $sql);
+        self::assertStringContainsString('FK_1F046E38DEA2B72E FOREIGN KEY (held_variant_id) REFERENCES sylius_product_variant (id) ON DELETE SET NULL', $sql);
+        self::assertStringContainsString('CREATE INDEX idx_bisn_product_status_created', $sql);
+        self::assertStringContainsString('DROP notify', $sql);
+        self::assertStringNotContainsString('DATETIME', $sql);
+        self::assertStringNotContainsString('TINYINT', $sql);
+        self::assertStringNotContainsString('CHANGE ', $sql);
+    }
+
+    public function testLifecycleMigrationBackfillsBeforeConstraints(): void
+    {
+        $sql = $this->upSql(Version20261030100000::class, new PostgreSQLPlatform());
+
+        self::assertStringContainsString("SET status = CASE WHEN notify THEN 'notified' ELSE 'waiting' END", $sql);
+        self::assertStringContainsString('SET email_canonical = LOWER(TRIM(email))', $sql);
+        self::assertLessThan(strpos($sql, 'ALTER COLUMN product_id SET NOT NULL'), strpos($sql, 'SET product_id = (SELECT'));
+        self::assertLessThan(strpos($sql, 'DROP notify'), strpos($sql, 'SET status = CASE'));
+    }
+
+    public function testLifecycleMigrationKeepsMysqlSqlOnMysql(): void
+    {
+        $sql = $this->upSql(Version20261030100000::class, new MySQL80Platform());
+
+        self::assertStringContainsString('ADD notified_at DATETIME DEFAULT NULL', $sql);
+        self::assertStringContainsString('DROP notify', $sql);
+        self::assertStringNotContainsString('TIMESTAMP', $sql);
+        self::assertStringNotContainsString('SET NOT NULL', $sql);
+        // MySQL error 1832: a column used by a foreign key cannot be changed while the key exists.
+        $dropFk = strpos($sql, 'DROP FOREIGN KEY FK_1F046E38A80EF684');
+        self::assertNotFalse($dropFk);
+        self::assertLessThan(strpos($sql, 'CHANGE product_variant_id'), $dropFk);
+        self::assertGreaterThan(
+            strpos($sql, 'CHANGE product_variant_id'),
+            strpos($sql, 'ADD CONSTRAINT FK_1F046E38A80EF684'),
+        );
+    }
+
     public function testDownMigrationsAreAvailableOnBothPlatforms(): void
     {
         foreach ([new PostgreSQLPlatform(), new MySQL80Platform()] as $platform) {
@@ -81,6 +126,16 @@ final class PlatformMigrationsTest extends TestCase
             $notify = $this->migration(Version20220523152238::class, $platform);
             $notify->down(new Schema());
             self::assertStringContainsString('DROP notify', $this->statements($notify));
+
+            $lifecycle = $this->migration(Version20261030100000::class, $platform);
+            $lifecycle->down(new Schema());
+            self::assertStringContainsString('ADD notify', $this->statements($lifecycle));
+            self::assertStringContainsString('DROP product_id', $this->statements($lifecycle));
+            $down = $this->statements($lifecycle);
+            self::assertLessThan(
+                strpos($down, $platform instanceof PostgreSQLPlatform ? 'ALTER COLUMN product_variant_id SET NOT NULL' : 'CHANGE product_variant_id'),
+                strpos($down, 'FK_1F046E38A80EF684'),
+            );
         }
     }
 

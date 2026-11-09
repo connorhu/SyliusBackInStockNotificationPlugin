@@ -25,11 +25,19 @@ services:
             - { name: kernel.event_listener, event: sylius.menu.admin.main, method: addAdminMenuItems }
     
     
+    Webgriffe\SyliusBackInStockNotificationPlugin\Target\TargetResolver:
+        arguments:
+            - '%webgriffe_sylius_back_in_stock_notification_plugin.target%'
+            - '@webgriffe.repository.back_in_stock_notification_subscription'
+
+    webgriffe.resolver.target: '@Webgriffe\SyliusBackInStockNotificationPlugin\Target\TargetResolver'
+
     Webgriffe\SyliusBackInStockNotificationPlugin\Validator\SubscriptionUniqueValidator:
         arguments:
             - '@webgriffe.repository.back_in_stock_notification_subscription'
             - '@sylius.repository.product_variant'
             - '@sylius.context.customer'
+            - '@sylius.canonicalizer'
         tags:
             - { name: validator.constraint_validator }
 
@@ -53,3 +61,9 @@ services:
             - '@sylius.repository.product_variant'
         tags:
             - { name: 'sylius.live_component.shop', key: 'webgriffe:sylius_shop:product:add_notification' }
+
+    webgriffe.factory.back_in_stock_notification_subscription:
+        class: Webgriffe\SyliusBackInStockNotificationPlugin\Factory\SubscriptionFactory
+        arguments:
+            - '%webgriffe.model.back_in_stock_notification_subscription.class%'
+            - '@sylius.canonicalizer'

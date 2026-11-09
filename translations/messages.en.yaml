@@ -38,3 +38,8 @@ webgriffe_bisn:
         show_customer: 'Show Customer'
         notified: 'Notified'
         not-notified: 'Not Notified'
+    status:
+        waiting: 'Waiting'
+        notified: 'Notified'
+        fulfilled: 'Fulfilled'
+        cancelled: 'Cancelled'
