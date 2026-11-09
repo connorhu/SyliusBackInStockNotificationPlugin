@@ -26,6 +26,8 @@ final class SubscriptionTypeTest extends TestCase
 
         $name = $form->get('name')->getConfig()->getOption('constraints');
         $email = $form->get('email')->getConfig()->getOption('constraints');
+        self::assertIsArray($name);
+        self::assertIsArray($email);
 
         self::assertInstanceOf(NotBlank::class, $name[0]);
         self::assertSame([self::GROUP], $name[0]->groups);
