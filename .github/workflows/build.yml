@@ -156,6 +156,9 @@ jobs:
                     fi
 
             -   name: Run PHPStan
+                # PHPStan 1.12 cannot parse Symfony 8's PHP 8.4 code (every HttpFoundation class reads as unknown);
+                # the Symfony 8 job runs it once the plugin moves to PHPStan 2.
+                if: matrix.symfony != '^8.0'
                 run: vendor/bin/phpstan analyse
 
             -   name: Run Psalm
