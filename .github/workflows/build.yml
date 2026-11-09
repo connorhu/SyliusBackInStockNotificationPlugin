@@ -29,6 +29,11 @@ jobs:
                         sylius: "^2.3"
                         node: "22.x"
                         mysql: "8.0"
+                    -   php: "8.4"
+                        symfony: "^8.0"
+                        sylius: "^2.3"
+                        node: "22.x"
+                        mysql: "8.0"
         env:
             APP_ENV: test
             DATABASE_URL: "mysql://root:root@127.0.0.1/sylius?serverVersion=${{ matrix.mysql }}"
@@ -151,6 +156,9 @@ jobs:
                     fi
 
             -   name: Run PHPStan
+                # PHPStan 1.12 cannot parse Symfony 8's PHP 8.4 code (every HttpFoundation class reads as unknown);
+                # the Symfony 8 job runs it once the plugin moves to PHPStan 2.
+                if: matrix.symfony != '^8.0'
                 run: vendor/bin/phpstan analyse
 
             -   name: Run Psalm

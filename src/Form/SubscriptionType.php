@@ -25,14 +25,14 @@ final class SubscriptionType extends AbstractType
             $builder
                 ->add('name', TextType::class, [
                     'constraints' => [
-                        new NotBlank([], null, null, null, ['webgriffe_sylius_back_in_stock_notification_plugin']),
+                        new NotBlank(groups: ['webgriffe_sylius_back_in_stock_notification_plugin']),
                         new Length(max: 255, groups: ['webgriffe_sylius_back_in_stock_notification_plugin']),
                     ],
                 ])
                 ->add('email', EmailType::class, [
                     'constraints' => [
-                        new NotBlank([], null, null, null, ['webgriffe_sylius_back_in_stock_notification_plugin']),
-                        new Email([], null, null, null, ['webgriffe_sylius_back_in_stock_notification_plugin']),
+                        new NotBlank(groups: ['webgriffe_sylius_back_in_stock_notification_plugin']),
+                        new Email(groups: ['webgriffe_sylius_back_in_stock_notification_plugin']),
                     ],
                 ])
             ;
