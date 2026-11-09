@@ -23,6 +23,12 @@ jobs:
                 sylius: [ "^2.0", "^2.1" ]
                 node: [ "20.x" ]
                 mysql: [ "8.0" ]
+                include:
+                    -   php: "8.3"
+                        symfony: "^7.3"
+                        sylius: "^2.3"
+                        node: "20.x"
+                        mysql: "8.0"
         env:
             APP_ENV: test
             DATABASE_URL: "mysql://root:root@127.0.0.1/sylius?serverVersion=${{ matrix.mysql }}"
