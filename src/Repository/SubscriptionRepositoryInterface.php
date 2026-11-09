@@ -11,6 +11,7 @@ use Doctrine\ORM\QueryBuilder;
 use Sylius\Component\Channel\Model\ChannelInterface;
 use Sylius\Component\Core\Model\ProductInterface;
 use Sylius\Component\Core\Model\ProductVariantInterface;
+use Sylius\Component\Customer\Model\CustomerInterface;
 use Sylius\Resource\Doctrine\Persistence\RepositoryInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionInterface;
 
@@ -55,4 +56,9 @@ interface SubscriptionRepositoryInterface extends RepositoryInterface
      * @return list<SubscriptionInterface>
      */
     public function findCancelledByIds(array $ids, string $emailCanonical, ChannelInterface $channel): array;
+
+    /**
+     * The newest pre-order of an e-mail address (canonical form) or of a customer on a channel, in any status.
+     */
+    public function findNewestByEmailOrCustomer(string $emailCanonical, ?CustomerInterface $customer, ChannelInterface $channel): ?SubscriptionInterface;
 }

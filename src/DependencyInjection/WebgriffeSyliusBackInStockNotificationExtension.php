@@ -48,6 +48,11 @@ final class WebgriffeSyliusBackInStockNotificationExtension extends AbstractReso
                     'limit' => 10,
                     'interval' => '1 hour',
                 ],
+                'webgriffe_bisn_preorder_ip' => [
+                    'policy' => 'sliding_window',
+                    'limit' => 10,
+                    'interval' => '1 hour',
+                ],
             ],
         ]);
     }

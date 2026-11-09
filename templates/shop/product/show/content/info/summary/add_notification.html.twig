@@ -8,6 +8,12 @@
             {% if notificationSent %}
                 <div class="alert alert-success" {{ sylius_test_html_attribute('sylius-flash-message') }}>{{ 'webgriffe_bisn.form_submission.subscription_successfully'|trans }}</div>
             {% endif %}
+            {% if rateLimitedMinutes is not null %}
+                <div class="alert alert-warning" role="alert">
+                    <strong>{{ 'webgriffe_bisn.form_submission.rate_limited.title'|trans }}</strong><br>
+                    {{ 'webgriffe_bisn.form_submission.rate_limited.body'|trans({'%count%': rateLimitedMinutes}) }}
+                </div>
+            {% endif %}
             {{ form_start(form, {'attr': {'data-action': 'live#action:prevent live#$render', 'data-live-action-param': 'addNotification'}}) }}
 
             {{ form_errors(form) }}

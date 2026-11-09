@@ -21,7 +21,7 @@ enum ProcessResult: string
             self::Created => null,
             self::AlreadySubscribed => $isGuest ? null : 'webgriffe_bisn.subscription.already_saved',
             self::NotPreorderable => 'webgriffe_bisn.subscription.not_preorderable',
-            self::RateLimited => 'webgriffe_bisn.subscription.rate_limited',
+            self::RateLimited => 'webgriffe_bisn.form_submission.rate_limited',
         };
     }
 }

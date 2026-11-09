@@ -20,6 +20,8 @@ use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Session\Session;
 use Symfony\Component\HttpFoundation\Session\Storage\MockArraySessionStorage;
 use Symfony\Component\HttpFoundation\UriSigner;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 use Symfony\Component\Routing\Exception\RouteNotFoundException;
 use Symfony\Component\Routing\RequestContext;
 use Symfony\Component\Routing\RouterInterface;
@@ -32,6 +34,7 @@ use Webgriffe\SyliusBackInStockNotificationPlugin\Manage\ManageLinkGenerator;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Preorderability\PreorderabilityResolverInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Processor\ProcessResult;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Processor\SubscriptionProcessor;
+use Webgriffe\SyliusBackInStockNotificationPlugin\RateLimit\PreorderRateLimiter;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Repository\SubscriptionRepositoryInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Session\GuestPreorderSession;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Target\TargetResolverInterface;
@@ -55,6 +58,8 @@ final class SubscriptionProcessorTest extends TestCase
     private ProductInterface&MockObject $product;
 
     private RequestContext $routerContext;
+
+    private PreorderRateLimiter $rateLimiter;
 
     private SubscriptionProcessor $processor;
 
@@ -91,6 +96,10 @@ final class SubscriptionProcessorTest extends TestCase
         $this->guestSession = new GuestPreorderSession($requestStack);
 
         $canonicalizer = new Canonicalizer();
+        $this->rateLimiter = new PreorderRateLimiter($this->repository, new RateLimiterFactory(
+            ['id' => 'test_ip', 'policy' => 'sliding_window', 'limit' => 10, 'interval' => '1 hour'],
+            new InMemoryStorage(),
+        ));
         $this->processor = new SubscriptionProcessor(
             new SubscriptionFactory(Subscription::class, $canonicalizer),
             $this->repository,
@@ -105,6 +114,7 @@ final class SubscriptionProcessorTest extends TestCase
             new ManageLinkGenerator($router, new UriSigner('secret')),
             $canonicalizer,
             new NullLogger(),
+            $this->rateLimiter,
         );
     }
 
@@ -163,6 +173,32 @@ final class SubscriptionProcessorTest extends TestCase
         $this->sender->expects(self::never())->method('send');
 
         $result = $this->processor->process($this->product, null, ' ANNA@Pelda.hu ', 'Anna', null);
+
+        self::assertSame(ProcessResult::AlreadySubscribed, $result);
+    }
+
+    public function testRateLimitedStoresNothing(): void
+    {
+        $this->customerRepository->method('findOneBy')->willReturn(null);
+        $recent = new Subscription();
+        $recent->setCreatedAt(new \DateTimeImmutable('-30 seconds'));
+        $this->repository->method('findNewestByEmailOrCustomer')->willReturn($recent);
+        $this->repository->expects(self::never())->method('add');
+        $this->sender->expects(self::never())->method('send');
+
+        $result = $this->processor->process($this->product, null, 'anna@pelda.hu', 'Anna', null, '1.2.3.4');
+
+        self::assertSame(ProcessResult::RateLimited, $result);
+        self::assertSame([], $this->guestSession->ids());
+    }
+
+    public function testDuplicateIsAnsweredBeforeTheRateLimit(): void
+    {
+        $this->customerRepository->method('findOneBy')->willReturn(null);
+        $this->targetResolver->method('findActive')->willReturn(new Subscription());
+        $this->repository->expects(self::never())->method('findNewestByEmailOrCustomer');
+
+        $result = $this->processor->process($this->product, null, 'anna@pelda.hu', 'Anna', null, '1.2.3.4');
 
         self::assertSame(ProcessResult::AlreadySubscribed, $result);
     }
@@ -245,6 +281,7 @@ final class SubscriptionProcessorTest extends TestCase
             new ManageLinkGenerator($router, new UriSigner('secret')),
             $canonicalizer,
             new NullLogger(),
+            $this->rateLimiter,
         );
         $this->repository->expects(self::once())->method('add');
         $this->sender->expects(self::never())->method('send');
@@ -353,6 +390,7 @@ final class SubscriptionProcessorTest extends TestCase
             new ManageLinkGenerator($router, new UriSigner('secret')),
             $canonicalizer,
             new NullLogger(),
+            $this->rateLimiter,
         );
     }
 }
