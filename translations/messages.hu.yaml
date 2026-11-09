@@ -19,6 +19,7 @@ webgriffe_bisn:
         alert_action: 'Megveszem'
         held_until: 'Egy példányt {until}-ig félreteszünk neked. Utána a sorban következő kapja meg.'
         fastest: 'Minden várakozó megkapta ezt a levelet: aki előbb rendel, azé.'
+        claim_hint: 'A gomb személyes: abban a böngészőben nyisd meg, amelyikben vásárolsz, és ott kosárba teheted a félretett példányt.'
     hold_expired_mail:
         title: 'Lejárt a félretétel'
         message: 'A(z) {product} neked félretett példányát már nem tartjuk, így a sorban következő kaphatja meg.'

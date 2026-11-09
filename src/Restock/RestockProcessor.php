@@ -10,6 +10,7 @@ use Sylius\Component\Core\Model\ChannelInterface;
 use Sylius\Component\Core\Model\ProductInterface;
 use Sylius\Component\Core\Model\ProductVariantInterface;
 use Symfony\Component\Routing\RouterInterface;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Claim\ClaimLinkGenerator;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\PreorderChannelSettingsInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionStatus;
@@ -46,6 +47,7 @@ final class RestockProcessor
         private SafeSender $sender,
         private RouterInterface $router,
         private LoggerInterface $logger,
+        private ClaimLinkGenerator $claimLinkGenerator,
     ) {
     }
 
@@ -259,10 +261,29 @@ final class RestockProcessor
                     'variant' => $heldVariant,
                     'mode' => $plan['mode'],
                     'holdUntil' => $holdUntil,
+                    'claimUrl' => $this->claimUrl($subscription),
                 ]);
             }
         } finally {
             $context->setHost($previousHost);
+        }
+    }
+
+    /**
+     * The signed claim link while the unit is held (queue mode), the product page otherwise; null (the template falls back
+     * to the product page) when it cannot be built, so a broken link never stops the run.
+     */
+    private function claimUrl(SubscriptionInterface $subscription): ?string
+    {
+        try {
+            return $this->claimLinkGenerator->generate($subscription);
+        } catch (\Throwable $exception) {
+            $this->logger->warning('webgriffe_bisn.restock.claim_link_failed', [
+                'subscription' => $subscription->getId(),
+                'exception' => $exception,
+            ]);
+
+            return null;
         }
     }
 

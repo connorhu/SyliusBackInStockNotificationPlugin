@@ -43,3 +43,9 @@ webgriffe_back_in_stock_notification_account_list_subscriptions:
             section: shop_account
             template: "@WebgriffeSyliusBackInStockNotificationPlugin/shop/account/subscription/index.html.twig"
             grid: webgriffe_back_in_stock_notification_account_list_subscriptions
+
+webgriffe_back_in_stock_notification_claim:
+    path: /back-in-stock-notification/claim/{hash}
+    methods: [ GET ]
+    defaults:
+        _controller: Webgriffe\SyliusBackInStockNotificationPlugin\Controller\ClaimController::claimAction
