@@ -6,11 +6,21 @@ namespace Webgriffe\SyliusBackInStockNotificationPlugin\Migrations;
 
 use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use Doctrine\DBAL\Schema\Schema;
+use Doctrine\DBAL\Types\Type;
 use Doctrine\Migrations\AbstractMigration;
 
 final class Version20261030100000 extends AbstractMigration
 {
     private const TABLE = 'webgriffe_back_in_stock_notification_subscription';
+
+    /**
+     * DBAL 3 marks non-default column types with a "(DC2Type:…)" comment; DBAL 4 (Symfony 8 stacks) does not, and its
+     * schema tool would report every such comment as a difference.
+     */
+    private static function storesTypeComments(): bool
+    {
+        return method_exists(Type::class, 'requiresSQLCommentHint');
+    }
 
     public function getDescription(): string
     {
@@ -38,11 +48,13 @@ final class Version20261030100000 extends AbstractMigration
             $this->addSql("ALTER TABLE $table ALTER COLUMN email_canonical SET NOT NULL");
             $this->addSql("ALTER TABLE $table ALTER COLUMN product_variant_id DROP NOT NULL");
             $this->addSql("ALTER TABLE $table DROP notify");
-            $this->addSql("COMMENT ON COLUMN $table.notified_at IS '(DC2Type:datetime_immutable)'");
-            $this->addSql("COMMENT ON COLUMN $table.hold_until IS '(DC2Type:datetime_immutable)'");
-            $this->addSql("COMMENT ON COLUMN $table.fulfilled_at IS '(DC2Type:datetime_immutable)'");
-            $this->addSql("COMMENT ON COLUMN $table.cancelled_at IS '(DC2Type:datetime_immutable)'");
-            $this->addSql("COMMENT ON COLUMN $table.dismissed_at IS '(DC2Type:datetime_immutable)'");
+            if (self::storesTypeComments()) {
+                $this->addSql("COMMENT ON COLUMN $table.notified_at IS '(DC2Type:datetime_immutable)'");
+                $this->addSql("COMMENT ON COLUMN $table.hold_until IS '(DC2Type:datetime_immutable)'");
+                $this->addSql("COMMENT ON COLUMN $table.fulfilled_at IS '(DC2Type:datetime_immutable)'");
+                $this->addSql("COMMENT ON COLUMN $table.cancelled_at IS '(DC2Type:datetime_immutable)'");
+                $this->addSql("COMMENT ON COLUMN $table.dismissed_at IS '(DC2Type:datetime_immutable)'");
+            }
             $this->addSql("ALTER TABLE $table DROP CONSTRAINT FK_1F046E38A80EF684");
             $this->addSql("ALTER TABLE $table ADD CONSTRAINT FK_1F046E38A80EF684 FOREIGN KEY (product_variant_id) REFERENCES sylius_product_variant (id) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE");
             $this->addSql("ALTER TABLE $table ADD CONSTRAINT FK_1F046E384584665A FOREIGN KEY (product_id) REFERENCES sylius_product (id) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE");
@@ -55,7 +67,8 @@ final class Version20261030100000 extends AbstractMigration
             return;
         }
 
-        $this->addSql("ALTER TABLE $table ADD product_id INT DEFAULT NULL, ADD name VARCHAR(255) DEFAULT NULL, ADD email_canonical VARCHAR(255) DEFAULT NULL, ADD status VARCHAR(16) NOT NULL DEFAULT 'waiting', ADD notified_at DATETIME DEFAULT NULL COMMENT '(DC2Type:datetime_immutable)', ADD hold_until DATETIME DEFAULT NULL COMMENT '(DC2Type:datetime_immutable)', ADD held_variant_id INT DEFAULT NULL, ADD fulfilled_at DATETIME DEFAULT NULL COMMENT '(DC2Type:datetime_immutable)', ADD cancelled_at DATETIME DEFAULT NULL COMMENT '(DC2Type:datetime_immutable)', ADD dismissed_at DATETIME DEFAULT NULL COMMENT '(DC2Type:datetime_immutable)'");
+        $comment = self::storesTypeComments() ? " COMMENT '(DC2Type:datetime_immutable)'" : '';
+        $this->addSql("ALTER TABLE $table ADD product_id INT DEFAULT NULL, ADD name VARCHAR(255) DEFAULT NULL, ADD email_canonical VARCHAR(255) DEFAULT NULL, ADD status VARCHAR(16) NOT NULL DEFAULT 'waiting', ADD notified_at DATETIME DEFAULT NULL{$comment}, ADD hold_until DATETIME DEFAULT NULL{$comment}, ADD held_variant_id INT DEFAULT NULL, ADD fulfilled_at DATETIME DEFAULT NULL{$comment}, ADD cancelled_at DATETIME DEFAULT NULL{$comment}, ADD dismissed_at DATETIME DEFAULT NULL{$comment}");
         $this->addBackfill();
         // The key must go before its column is changed (MySQL error 1832).
         $this->addSql("ALTER TABLE $table DROP FOREIGN KEY FK_1F046E38A80EF684");
