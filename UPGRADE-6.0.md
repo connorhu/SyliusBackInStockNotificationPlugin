@@ -26,3 +26,15 @@ Run the migrations: `Version20261030100000` adds `product_id` (NOT NULL, back-fi
 `email_canonical` (back-filled `LOWER(TRIM(email))`), `status` (back-filled from `notify`), the notification/hold/fulfil/cancel/dismiss
 timestamps and `held_variant_id`, makes `product_variant_id` nullable, and drops `notify`.
 The `down()` removes subscriptions without a variant, since the old schema cannot hold them.
+
+## Pre-orderability
+
+- Implement `PreorderabilityAwareInterface` on your `Product` and `Taxon` entities and `PreorderChannelSettingsInterface` on your `Channel`
+  entity, and use `ProductPreorderabilityTrait` / `TaxonPreorderabilityTrait` / `PreorderChannelSettingsTrait` (see the README for the
+  XML-mapping alternative). Without them every product counts as `inherit` and every channel uses the defaults (pre-orders enabled).
+- Run the migration `Version20261030110000`: it adds `sylius_product.preorderability` and `sylius_taxon.preorderability`
+  (`inherit`), and `sylius_channel.preorder_enabled_by_default` (`true`), `preorder_mode` (`queue`), `preorder_hold_hours` (`24`) and
+  `preorder_rate_limit_seconds` (`120`). The columns exist whether or not you use the traits; map them in your entities
+  (the traits do it), otherwise `doctrine:schema:validate` reports them as unmapped.
+- `AddNotificationComponent` takes two more constructor arguments (the `PreorderabilityResolverInterface` and the channel context);
+  the block renders nothing when the product is not pre-orderable in the current channel.

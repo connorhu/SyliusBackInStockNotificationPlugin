@@ -15,6 +15,7 @@ use Psr\Log\NullLogger;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Migrations\Version20210419151725;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Migrations\Version20220523152238;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Migrations\Version20261030100000;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Migrations\Version20261030110000;
 
 final class PlatformMigrationsTest extends TestCase
 {
@@ -112,6 +113,29 @@ final class PlatformMigrationsTest extends TestCase
         );
     }
 
+    public function testPreorderabilityMigrationEmitsPostgresqlSqlOnPostgres(): void
+    {
+        $sql = $this->upSql(Version20261030110000::class, new PostgreSQLPlatform());
+
+        self::assertStringContainsString("ALTER TABLE sylius_product ADD preorderability VARCHAR(16) DEFAULT 'inherit' NOT NULL", $sql);
+        self::assertStringContainsString("ALTER TABLE sylius_taxon ADD preorderability VARCHAR(16) DEFAULT 'inherit' NOT NULL", $sql);
+        self::assertStringContainsString('ADD preorder_enabled_by_default BOOLEAN DEFAULT true NOT NULL', $sql);
+        self::assertStringContainsString("ADD preorder_mode VARCHAR(16) DEFAULT 'queue' NOT NULL", $sql);
+        self::assertStringContainsString('ADD preorder_hold_hours INT DEFAULT 24 NOT NULL', $sql);
+        self::assertStringContainsString('ADD preorder_rate_limit_seconds INT DEFAULT 120 NOT NULL', $sql);
+        self::assertStringNotContainsString('TINYINT', $sql);
+    }
+
+    public function testPreorderabilityMigrationEmitsMysqlSqlOnMysql(): void
+    {
+        $sql = $this->upSql(Version20261030110000::class, new MySQL80Platform());
+
+        self::assertStringContainsString("ALTER TABLE sylius_product ADD preorderability VARCHAR(16) DEFAULT 'inherit' NOT NULL", $sql);
+        self::assertStringContainsString('ADD preorder_enabled_by_default TINYINT(1) DEFAULT 1 NOT NULL', $sql);
+        self::assertStringContainsString('ADD preorder_hold_hours INT DEFAULT 24 NOT NULL', $sql);
+        self::assertStringNotContainsString('BOOLEAN', $sql);
+    }
+
     public function testDownMigrationsAreAvailableOnBothPlatforms(): void
     {
         foreach ([new PostgreSQLPlatform(), new MySQL80Platform()] as $platform) {
@@ -136,6 +160,11 @@ final class PlatformMigrationsTest extends TestCase
                 strpos($down, $platform instanceof PostgreSQLPlatform ? 'ALTER COLUMN product_variant_id SET NOT NULL' : 'CHANGE product_variant_id'),
                 strpos($down, 'FK_1F046E38A80EF684'),
             );
+
+            $preorderability = $this->migration(Version20261030110000::class, $platform);
+            $preorderability->down(new Schema());
+            self::assertStringContainsString('ALTER TABLE sylius_product DROP preorderability', $this->statements($preorderability));
+            self::assertStringContainsString('DROP preorder_rate_limit_seconds', $this->statements($preorderability));
         }
     }
 
