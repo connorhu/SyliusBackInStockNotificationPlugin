@@ -19,7 +19,7 @@ Feature: Ability to get notified for a specific product when it will be back in 
     And I select its Size as "Large"
     And I select its Size as "Small"
     And I subscribe to the alert list for the product "T-shirt banana"
-    Then I should be notified that the email is subscribed correctly
+    Then I should see that I have pre-ordered the product
     And an email with a success message should be sent to "francis@underwood.com"
 
   @ui @javascript

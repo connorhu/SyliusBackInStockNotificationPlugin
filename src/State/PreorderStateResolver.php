@@ -48,7 +48,8 @@ final class PreorderStateResolver
         $own = $this->ofTarget($this->holdVisitor->subscriptions(), $product, $targetVariant, $variantTarget, $channel);
         foreach ($own as $subscription) {
             foreach ($variants as $candidate) {
-                if ($this->holdVisitor->holdsActively($subscription, $candidate, $now)) {
+                // A hold on a unit that is gone (sold meanwhile) is not shown; the next restock run releases it.
+                if ($this->holdVisitor->holdsActively($subscription, $candidate, $now) && $this->sellableUnits->of($candidate, $channel) > 0) {
                     return new PreorderView(PreorderState::HeldForYou, $subscription, $subscription->getHoldUntil());
                 }
             }

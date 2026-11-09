@@ -1,7 +1,17 @@
-{% if data == 'notified' or data == 'fulfilled' %}
-    <span class="badge text-bg-success">
+{% if data == 'waiting' %}
+    <span class="badge text-bg-warning">
+        {{ ux_icon('tabler:clock', {class: 'icon icon-sm'}) }}
+        {{ 'webgriffe_bisn.status.waiting'|trans }}
+    </span>
+{% elseif data == 'notified' %}
+    <span class="badge text-bg-info">
         {{ ux_icon('tabler:bell', {class: 'icon icon-sm'}) }}
-        {{ 'webgriffe_bisn.admin.notified'|trans }}
+        {{ 'webgriffe_bisn.status.notified'|trans }}
+    </span>
+{% elseif data == 'fulfilled' %}
+    <span class="badge text-bg-success">
+        {{ ux_icon('tabler:check', {class: 'icon icon-sm'}) }}
+        {{ 'webgriffe_bisn.status.fulfilled'|trans }}
     </span>
 {% elseif data == 'cancelled' %}
     <span class="badge text-bg-secondary">
@@ -9,8 +19,5 @@
         {{ 'webgriffe_bisn.status.cancelled'|trans }}
     </span>
 {% else %}
-    <span class="badge text-bg-danger">
-        {{ ux_icon('tabler:bell', {class: 'icon icon-sm'}) }}
-        {{ 'webgriffe_bisn.admin.not-notified'|trans }}
-    </span>
+    <span class="badge text-bg-light">{{ data }}</span>
 {% endif %}

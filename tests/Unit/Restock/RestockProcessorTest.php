@@ -364,10 +364,82 @@ final class RestockProcessorTest extends TestCase
             self::assertNull($subscription->getNotifiedAt());
         }
         self::assertEquals($this->now->modify('-10 days'), $anna->getCreatedAt());
-        self::assertSame(['anna@example.com'], $this->recipients(self::HOLD_EXPIRED));
-        self::assertFalse($this->mailTo(self::HOLD_EXPIRED, 'anna@example.com')['sellable']);
-        self::assertSame([], $this->recipients(self::ALERT));
+        // The held unit is gone, so nobody is next in line for it: no "hold expired" mail.
+        self::assertSame([], $this->mails);
         self::assertSame([0, 0, 1, 2], $this->counts($report));
+    }
+
+    public function testHolderGoesBackToWaitingWhenHeldUnitIsSold(): void
+    {
+        $channel = $this->channel();
+        $product = $this->product($channel);
+        $variant = $this->variant($product, 0);
+        $anna = $this->subscription($product, $channel, 'anna@example.com', '-10 days');
+        $anna->markNotified($this->now->modify('-1 hour'), $variant, $this->now->modify('+23 hours'));
+
+        $report = $this->processor->process($this->now);
+
+        self::assertSame(SubscriptionStatus::WAITING, $anna->getStatus());
+        self::assertNull($anna->getHeldVariant());
+        self::assertNull($anna->getHoldUntil());
+        self::assertEquals($this->now->modify('-10 days'), $anna->getCreatedAt());
+        self::assertSame([], $this->mails);
+        self::assertSame([0, 0, 1, 1], $this->counts($report));
+    }
+
+    public function testHolderOfASoldUnitStaysNotifiedWithoutHoldWhileTheTargetIsSellable(): void
+    {
+        $channel = $this->channel();
+        $product = $this->product($channel);
+        $sold = $this->variant($product, 0);
+        $free = $this->variant($product, 1);
+        $anna = $this->subscription($product, $channel, 'anna@example.com', '-10 days');
+        $anna->markNotified($this->now->modify('-1 hour'), $sold, $this->now->modify('+23 hours'));
+        $bela = $this->subscription($product, $channel, 'bela@example.com', '-9 days');
+
+        $report = $this->processor->process($this->now);
+
+        self::assertSame(SubscriptionStatus::NOTIFIED, $anna->getStatus());
+        self::assertNull($anna->getHeldVariant());
+        self::assertNull($anna->getHoldUntil());
+        self::assertSame($free, $bela->getHeldVariant());
+        self::assertSame([], $this->recipients(self::HOLD_EXPIRED));
+        self::assertSame(['bela@example.com'], $this->recipients(self::ALERT));
+        self::assertSame([1, 1, 1, 0], $this->counts($report));
+    }
+
+    public function testExpiredHoldOnASoldUnitSendsNoHoldExpiredMail(): void
+    {
+        $channel = $this->channel();
+        $product = $this->product($channel);
+        $sold = $this->variant($product, 0);
+        $this->variant($product, 1);
+        $anna = $this->subscription($product, $channel, 'anna@example.com', '-10 days');
+        $anna->markNotified($this->now->modify('-2 days'), $sold, $this->now->modify('-1 day'));
+
+        $this->processor->process($this->now);
+
+        self::assertSame(SubscriptionStatus::NOTIFIED, $anna->getStatus());
+        self::assertNull($anna->getHeldVariant());
+        self::assertSame([], $this->recipients(self::HOLD_EXPIRED));
+    }
+
+    public function testExcessHoldsReleaseTheNewestHolder(): void
+    {
+        $channel = $this->channel();
+        $product = $this->product($channel);
+        $variant = $this->variant($product, 1);
+        $anna = $this->subscription($product, $channel, 'anna@example.com', '-10 days');
+        $anna->markNotified($this->now->modify('-2 hours'), $variant, $this->now->modify('+22 hours'));
+        $bela = $this->subscription($product, $channel, 'bela@example.com', '-9 days');
+        $bela->markNotified($this->now->modify('-1 hour'), $variant, $this->now->modify('+23 hours'));
+
+        $this->processor->process($this->now);
+
+        self::assertSame($variant, $anna->getHeldVariant());
+        self::assertSame(SubscriptionStatus::NOTIFIED, $bela->getStatus());
+        self::assertNull($bela->getHeldVariant());
+        self::assertSame([], $this->mails);
     }
 
     public function testDisabledOrUnpricedVariantIsNotSellable(): void

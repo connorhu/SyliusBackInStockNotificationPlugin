@@ -1,0 +1,79 @@
+{#
+    The account list. `rows` are AccountRow objects, `undoCount` the number of pre-orders that were just cancelled and can
+    still be restored; both come through the hook context. Every action is a POST with the account CSRF token.
+#}
+{% set rows = hookable_metadata.context.rows %}
+{% set undoCount = hookable_metadata.context.undoCount %}
+{% set csrf = csrf_token('webgriffe_bisn_account') %}
+
+{% if undoCount > 0 %}
+    <div class="alert alert-info d-flex justify-content-between align-items-center" role="status" {{ sylius_test_html_attribute('undo-bar') }}>
+        <span>{{ 'webgriffe_bisn.my_account_section.cancelled'|trans({'{count}': undoCount}) }}</span>
+        <form method="post" action="{{ path('webgriffe_back_in_stock_notification_account_restore') }}">
+            <input type="hidden" name="_token" value="{{ csrf }}">
+            <button type="submit" class="btn btn-sm btn-outline-primary">{{ 'webgriffe_bisn.my_account_section.undo'|trans }}</button>
+        </form>
+    </div>
+{% endif %}
+
+{% if rows is empty %}
+    <div class="alert alert-info" {{ sylius_test_html_attribute('no-subscriptions') }}>
+        <div class="alert-title">{{ 'webgriffe_bisn.my_account_section.info_empty_list'|trans }}</div>
+        {{ 'webgriffe_bisn.my_account_section.empty_list'|trans }}
+    </div>
+{% else %}
+    <ul class="list-group mb-3" data-test-grid-table-body>
+        {% for row in rows %}
+            {% set subscription = row.subscription %}
+            {% set product = subscription.product %}
+            <li class="list-group-item d-flex justify-content-between align-items-center gap-3{{ row.state == 'fulfilled' ? ' opacity-50' : '' }}"
+                data-test-row data-state="{{ row.state }}">
+                <div>
+                    <div class="fw-bold">
+                        <a href="{{ path('sylius_shop_product_show', {'slug': product.slug, '_locale': app.request.locale}) }}">{{ product.name }}</a>
+                    </div>
+                    {% if subscription.productVariant %}
+                        <div class="small text-muted">{{ subscription.productVariant.name ?: subscription.productVariant.code }}</div>
+                    {% endif %}
+                    <div class="small mt-1">
+                        {% if row.state == 'held' %}
+                            <span class="badge text-bg-success">{{ 'webgriffe_bisn.my_account_section.state.held'|trans }}</span>
+                            {{ 'webgriffe_bisn.my_account_section.held_until'|trans({'{until}': subscription.holdUntil|format_datetime('medium', 'short', timezone=webgriffe_bisn_timezone())}) }}
+                        {% elseif row.state == 'arrived' %}
+                            <span class="badge text-bg-warning">{{ 'webgriffe_bisn.my_account_section.state.arrived'|trans }}</span>
+                            {{ 'webgriffe_bisn.my_account_section.arrived'|trans }}
+                        {% elseif row.state == 'fulfilled' %}
+                            <span class="badge text-bg-secondary">{{ 'webgriffe_bisn.my_account_section.state.fulfilled'|trans }}</span>
+                        {% else %}
+                            <span class="badge text-bg-primary">{{ 'webgriffe_bisn.my_account_section.state.waiting'|trans }}</span>
+                            {% if row.position is same as(1) %}
+                                {{ 'webgriffe_bisn.my_account_section.next_in_line'|trans }}
+                            {% elseif row.position is not null %}
+                                {{ 'webgriffe_bisn.my_account_section.in_line'|trans({'{position}': row.position}) }}
+                            {% endif %}
+                        {% endif %}
+                        <span class="text-muted">&middot; {{ subscription.createdAt|format_datetime('medium', 'none', timezone=webgriffe_bisn_timezone()) }}</span>
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    {% if row.state == 'held' or row.state == 'arrived' %}
+                        <a class="btn btn-sm btn-primary" href="{{ path('sylius_shop_product_show', {'slug': product.slug, '_locale': app.request.locale}) }}">
+                            {{ 'webgriffe_bisn.my_account_section.buy'|trans }}
+                        </a>
+                    {% endif %}
+                    {% if row.state == 'fulfilled' %}
+                        <form method="post" action="{{ path('webgriffe_back_in_stock_notification_account_dismiss', {'id': subscription.id}) }}">
+                            <input type="hidden" name="_token" value="{{ csrf }}">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary" data-test-button-dismiss>{{ 'webgriffe_bisn.my_account_section.remove'|trans }}</button>
+                        </form>
+                    {% else %}
+                        <form method="post" action="{{ path('webgriffe_back_in_stock_notification_account_cancel', {'id': subscription.id}) }}">
+                            <input type="hidden" name="_token" value="{{ csrf }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" data-test-button-cancel>{{ 'webgriffe_bisn.my_account_section.cancel'|trans }}</button>
+                        </form>
+                    {% endif %}
+                </div>
+            </li>
+        {% endfor %}
+    </ul>
+{% endif %}

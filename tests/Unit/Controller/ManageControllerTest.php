@@ -9,6 +9,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Sylius\Component\Channel\Context\ChannelContextInterface;
 use Sylius\Component\Core\Model\ChannelInterface;
+use Sylius\Component\Core\Model\Product;
 use Sylius\Component\Customer\Context\CustomerContextInterface;
 use Sylius\Component\Mailer\Sender\SenderInterface;
 use Sylius\Component\User\Canonicalizer\Canonicalizer;
@@ -26,6 +27,7 @@ use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 use Twig\Environment;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Controller\ManageController;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Customer\SubscriptionRestorer;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\Subscription;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionStatus;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Mailer\SafeSender;
@@ -140,6 +142,27 @@ final class ManageControllerTest extends TestCase
 
         self::assertSame(SubscriptionStatus::WAITING, $one->getStatus());
         self::assertSame(SubscriptionStatus::WAITING, $two->getStatus());
+    }
+
+    public function testRestoreKeepsCancelledWhenTheSameTargetIsPreorderedAgain(): void
+    {
+        $this->manageSession->grant('a@b.hu', new \DateTimeImmutable('+1 hour'));
+        $product = new Product();
+        $one = $this->subscription(1);
+        $one->setProduct($product);
+        $one->setChannel($this->channel);
+        $one->setEmailCanonical('a@b.hu');
+        $one->markCancelled(new \DateTimeImmutable());
+        $this->push($this->post());
+        $this->undoSession->remember([1], new \DateTimeImmutable('-1 minute'));
+        $this->repository->method('findCancelledByIds')->willReturn([$one]);
+        $this->repository->method('findActiveOne')->with('a@b.hu', $product, null, $this->channel)->willReturn($this->subscription(9));
+        $this->repository->expects(self::never())->method('add');
+
+        $this->controller->restoreAction($this->post());
+
+        self::assertSame(SubscriptionStatus::CANCELLED, $one->getStatus());
+        self::assertSame(['webgriffe_bisn.restore_refused'], $this->session->getFlashBag()->get('info'));
     }
 
     public function testRestoreAfter10MinutesDoesNothing(): void
@@ -369,6 +392,7 @@ final class ManageControllerTest extends TestCase
             $this->linkMailer,
             new RateLimiterFactory(['id' => 'email', 'policy' => 'fixed_window', 'limit' => 1, 'interval' => '60 seconds'], new InMemoryStorage()),
             new RateLimiterFactory(['id' => 'ip', 'policy' => 'sliding_window', 'limit' => 10, 'interval' => '1 hour'], new InMemoryStorage()),
+            new SubscriptionRestorer($this->repository),
         );
     }
 }

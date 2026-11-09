@@ -35,4 +35,4 @@ default:
                 - sylius.behat.context.transform.channel
                 - sylius.behat.context.transform.shared_storage
             filters:
-                tags: "@customer_account && @ui && ~@pending_account_ui"
+                tags: "@customer_account && @ui"

@@ -11,13 +11,15 @@ use Sylius\Component\Core\Model\ProductVariantInterface;
 use Sylius\Component\User\Canonicalizer\CanonicalizerInterface;
 use Symfony\Component\EventDispatcher\GenericEvent;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionInterface;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Hold\ClaimSession;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Hold\HoldVisitor;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Repository\SubscriptionRepositoryInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Target\TargetResolverInterface;
 
 /**
  * A placed order fulfils the active pre-orders of its customer (or, for pre-orders without a customer, of its canonical
- * e-mail) whose target contains an ordered variant; their holds are released. It never breaks the checkout: any
+ * e-mail, or whose claim link was opened in this browser session, whatever the checkout e-mail) whose target contains an
+ * ordered variant; their holds are released. It never breaks the checkout: any
  * failure is logged. The order is already committed when the event runs; a failing flush closes the shared entity
  * manager, which later listeners of the same event would notice.
  */
@@ -29,6 +31,7 @@ final class OrderCompletedListener
         private TargetResolverInterface $targetResolver,
         private CanonicalizerInterface $canonicalizer,
         private LoggerInterface $logger,
+        private ClaimSession $claimSession,
     ) {
     }
 
@@ -58,16 +61,16 @@ final class OrderCompletedListener
                 $variants[] = $variant;
             }
         }
-        $customer = $order->getCustomer();
-        $email = $customer?->getEmail();
-        if ([] === $variants || null === $customer) {
+        if ([] === $variants) {
             return;
         }
+        $customer = $order->getCustomer();
+        $email = $customer?->getEmail();
 
         $emailCanonical = null === $email ? null : $this->canonicalizer->canonicalize($email);
         $now = new \DateTimeImmutable();
         $changed = false;
-        foreach ($this->subscriptionRepository->findActiveByVisitor($customer, $emailCanonical, []) as $subscription) {
+        foreach ($this->subscriptionRepository->findActiveByVisitor($customer, $emailCanonical, $this->claimSession->claimedIds()) as $subscription) {
             if (!$subscription->isActive() || !$this->targetContainsAny($subscription, $variants)) {
                 continue;
             }

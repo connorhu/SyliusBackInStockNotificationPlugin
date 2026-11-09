@@ -9,4 +9,6 @@ interface SubscriptionFormElementInterface
     public function submitFormAsAGuest(string $variant, string $email): void;
 
     public function submitFormAsALoggedCustomer(string $variant): void;
+
+    public function isPreordered(): bool;
 }

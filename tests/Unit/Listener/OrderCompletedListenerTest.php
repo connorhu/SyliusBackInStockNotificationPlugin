@@ -17,10 +17,15 @@ use Sylius\Component\Core\Model\ProductVariant;
 use Sylius\Component\Customer\Model\CustomerInterface;
 use Sylius\Component\User\Canonicalizer\Canonicalizer;
 use Symfony\Component\EventDispatcher\GenericEvent;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\HttpFoundation\Session\Session;
+use Symfony\Component\HttpFoundation\Session\Storage\MockArraySessionStorage;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\Subscription;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Entity\SubscriptionStatus;
 use Webgriffe\SyliusBackInStockNotificationPlugin\EventListener\OrderCompletedListener;
+use Webgriffe\SyliusBackInStockNotificationPlugin\Hold\ClaimSession;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Repository\SubscriptionRepositoryInterface;
 use Webgriffe\SyliusBackInStockNotificationPlugin\Target\TargetResolver;
 
@@ -38,8 +43,16 @@ final class OrderCompletedListenerTest extends TestCase
 
     private Channel $channel;
 
+    private RequestStack $requestStack;
+
+    private int $nextId = 1;
+
     protected function setUp(): void
     {
+        $request = new Request();
+        $request->setSession(new Session(new MockArraySessionStorage()));
+        $this->requestStack = new RequestStack();
+        $this->requestStack->push($request);
         $this->channel = new Channel();
         $this->channel->setCode('WEB');
     }
@@ -98,6 +111,24 @@ final class OrderCompletedListenerTest extends TestCase
         self::assertSame(SubscriptionStatus::FULFILLED, $preorder->getStatus());
     }
 
+    public function testFulfilsPreorderClaimedInThisSessionWhateverTheCheckoutEmail(): void
+    {
+        [$product, $variant] = $this->productWithVariant();
+        [$otherProduct] = $this->productWithVariant();
+        $claimed = $this->subscription($product, 'anna@example.com');
+        $claimed->markNotified(new \DateTimeImmutable('-1 hour'), $variant, new \DateTimeImmutable('+1 day'));
+        $claimedOther = $this->subscription($otherProduct, 'anna@example.com');
+        $claims = new ClaimSession($this->requestStack);
+        $claims->claim((int) $claimed->getId());
+        $claims->claim((int) $claimedOther->getId());
+
+        $this->listener('product')->onOrderPostComplete(new GenericEvent($this->order('someone-else@example.com', $variant)));
+
+        self::assertSame(SubscriptionStatus::FULFILLED, $claimed->getStatus());
+        self::assertNull($claimed->getHeldVariant());
+        self::assertSame(SubscriptionStatus::WAITING, $claimedOther->getStatus());
+    }
+
     public function testFailureIsLoggedAndSwallowed(): void
     {
         [, $variant] = $this->productWithVariant();
@@ -117,6 +148,7 @@ final class OrderCompletedListenerTest extends TestCase
             }
 
             return array_values(array_filter($this->subscriptions, static fn (SubscriptionInterface $s): bool => $s->isActive() && (
+                in_array($s->getId(), $ids, true) ||
                 (null !== $customer && $s->getCustomer() === $customer) ||
                 (null === $s->getCustomer() && null !== $emailCanonical && $s->getEmailCanonical() === $emailCanonical)
             )));
@@ -131,7 +163,7 @@ final class OrderCompletedListenerTest extends TestCase
             $this->logs[] = $message;
         });
 
-        return new OrderCompletedListener($repository, $manager, new TargetResolver($target, $repository), new Canonicalizer(), $logger);
+        return new OrderCompletedListener($repository, $manager, new TargetResolver($target, $repository), new Canonicalizer(), $logger, new ClaimSession($this->requestStack));
     }
 
     /** @return array{Product, ProductVariant} */
@@ -163,6 +195,7 @@ final class OrderCompletedListenerTest extends TestCase
     private function subscription(Product $product, string $email, ?CustomerInterface $customer = null): Subscription
     {
         $subscription = new Subscription();
+        (new \ReflectionProperty(Subscription::class, 'id'))->setValue($subscription, $this->nextId++);
         $subscription->setProduct($product);
         $subscription->setChannel($this->channel);
         $subscription->setEmail($email);

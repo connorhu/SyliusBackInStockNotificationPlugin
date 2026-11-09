@@ -21,6 +21,8 @@ final class AlertCommand extends Command
 
     public function __construct(
         private RestockProcessor $restockProcessor,
+        private string $projectDir,
+        private string $environment,
         ?string $name = null,
     ) {
         parent::__construct($name);
@@ -35,7 +37,9 @@ final class AlertCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        if (!$this->lock()) {
+        // The default lock store is system wide (a semaphore keyed by the name), so the name carries the installation:
+        // two installations or environments on one host (staging and production) never skip each other's runs.
+        if (!$this->lock(sprintf('%s-%s', (string) $this->getName(), hash('xxh128', $this->projectDir . '|' . $this->environment)))) {
             $output->writeln('The command is already running in another process.');
 
             return Command::SUCCESS;

@@ -10,3 +10,11 @@ webgriffe_admin_notification_subscription:
             all:
                 hook_prefix: 'webgriffe_sylius_back_in_stock_notification_plugin.admin.notification_subscription'
     type: sylius.resource
+
+webgriffe_admin_back_in_stock_notification_subscription_cancel:
+    path: /subscriptions/{id}/cancel
+    methods: [ POST ]
+    requirements:
+        id: '\d+'
+    defaults:
+        _controller: Webgriffe\SyliusBackInStockNotificationPlugin\Controller\AdminCancelController::cancelAction

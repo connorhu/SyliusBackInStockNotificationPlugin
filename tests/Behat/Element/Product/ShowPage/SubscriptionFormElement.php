@@ -24,12 +24,25 @@ final class SubscriptionFormElement extends Element implements SubscriptionFormE
         $this->waitForProductPageRefresh();
     }
 
+    public function isPreordered(): bool
+    {
+        for ($attempt = 0; $attempt < 20; ++$attempt) {
+            if ($this->hasElement('preordered')) {
+                return true;
+            }
+            usleep(250000);
+        }
+
+        return false;
+    }
+
     protected function getDefinedElements(): array
     {
         return array_merge(parent::getDefinedElements(), [
             'open_overlay' => '#trigger-notification-overlay',
             'add_name' => '[data-live-name-value="webgriffe:sylius_shop:product:add_notification"] [data-test-name]',
             'add_email' => '[data-live-name-value="webgriffe:sylius_shop:product:add_notification"] [data-test-email]',
+            'preordered' => '[data-live-name-value="webgriffe:sylius_shop:product:add_notification"] [data-test-preordered]',
             'form' => '[data-live-name-value="webgriffe:sylius_shop:product:add_notification"]',
             'submit_form' => '[data-test-button="add-notification"]',
         ]);

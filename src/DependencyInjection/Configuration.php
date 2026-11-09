@@ -21,6 +21,10 @@ final class Configuration implements ConfigurationInterface
                     ->defaultValue('variant')
                     ->info('What a subscription waits for: any variant of a product, or one specific variant.')
                 ->end()
+                ->scalarNode('display_timezone')
+                    ->defaultNull()
+                    ->info('Time zone (e.g. Europe/Budapest) used to print hold deadlines in the shop; null uses the PHP default time zone.')
+                ->end()
             ->end()
         ;
 
